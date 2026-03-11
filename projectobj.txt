@@ -1,0 +1,34 @@
+We need to build a school management system with a web admin panel and an Android app.
+Phase 1 Modules
+Student Information Management (student profiles, admission details, records)
+Fee Management
+Online Fee Payment Integration
+Attendance Management
+Homework Management
+Notices / Announcements
+Report Card / Marksheet Management
+Leave Application System
+Platform Requirements
+Web Admin Panel for school management
+Android mobile app for parents and teachers
+The web panel should be fully mobile responsive so it works properly on phones as well (this will allow iOS users to access the system through browser).
+Other Requirements
+Data export capability (Excel / CSV/ pdf) for students, fees, attendance, reports, etc.
+Clean database structure so additional modules can be added later
+Modular architecture since future modules like transport, exams, library, payroll, inventory, etc. may be added later.
+
+For frontend also use PHP/ Laravel framework blade
+Backend / Web Panel
+
+PHP (Laravel Framework)
+MySQL Database
+REST API for mobile app integration
+
+
+
+The web panel should be built mobile responsive so it works smoothly on phones as well, allowing iOS users to access the system through the browser.
+
+If you don't want to develop the mobile app from scratch. Then we can use a trick for that. Make the web UI for mobile look exactly like an android app. 
+And in the android app use web view. 
+
+This will save the work and also kind of solve our problem with limited time.
