@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Installation Guide - School Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        :root { --primary: #3b82f6; --dark: #1e293b; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f8fafc; color: #334155; line-height: 1.7; }
+        .hero { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: #fff; padding: 60px 0 40px; }
+        .hero h1 { font-weight: 800; font-size: 2.2rem; }
+        .hero .badge-ver { background: rgba(59,130,246,0.2); color: #93c5fd; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; }
+        .sidebar-nav { position: sticky; top: 20px; }
+        .sidebar-nav a { display: block; padding: 8px 16px; color: #64748b; text-decoration: none; font-size: 0.9rem; border-left: 2px solid #e2e8f0; transition: all 0.2s; }
+        .sidebar-nav a:hover, .sidebar-nav a.active { color: var(--primary); border-left-color: var(--primary); background: rgba(59,130,246,0.04); }
+        .sidebar-nav .nav-section { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; padding: 12px 16px 4px; font-weight: 600; border-left: 2px solid transparent; }
+        .content-section { padding: 32px 0; border-bottom: 1px solid #e2e8f0; }
+        .content-section:last-child { border-bottom: none; }
+        .content-section h2 { font-weight: 700; color: var(--dark); margin-bottom: 16px; font-size: 1.5rem; }
+        .content-section h3 { font-weight: 600; color: var(--dark); margin-top: 24px; margin-bottom: 12px; font-size: 1.15rem; }
+        .step-badge { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: #fff; font-weight: 700; font-size: 0.85rem; margin-right: 8px; }
+        .code-block { background: #1e293b; color: #e2e8f0; padding: 16px 20px; border-radius: 10px; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 0.88rem; overflow-x: auto; margin: 12px 0; position: relative; }
+        .code-block .comment { color: #64748b; }
+        .code-block .cmd { color: #93c5fd; }
+        .code-block .string { color: #86efac; }
+        .code-block .keyword { color: #c4b5fd; }
+        .info-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px 20px; margin: 16px 0; }
+        .info-box.warning { background: #fefce8; border-color: #fde68a; }
+        .info-box.danger { background: #fef2f2; border-color: #fecaca; }
+        .info-box.success { background: #f0fdf4; border-color: #bbf7d0; }
+        .info-box strong { display: block; margin-bottom: 4px; }
+        .req-table td, .req-table th { padding: 10px 16px; font-size: 0.9rem; }
+        .feature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin: 16px 0; }
+        .feature-item { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; text-align: center; }
+        .feature-item i { font-size: 1.5rem; color: var(--primary); margin-bottom: 8px; display: block; }
+        .screenshot-placeholder { background: #e2e8f0; border-radius: 12px; padding: 40px; text-align: center; color: #94a3b8; margin: 16px 0; }
+        .tab-content { padding-top: 16px; }
+        .nav-tabs .nav-link { font-weight: 600; color: #64748b; }
+        .nav-tabs .nav-link.active { color: var(--primary); }
+        ol.steps > li { margin-bottom: 20px; }
+        ol.steps > li > strong { color: var(--dark); }
+        .credential-box { background: #fff; border: 2px dashed #cbd5e1; border-radius: 10px; padding: 20px; display: inline-block; margin: 12px 0; }
+        .credential-box .label { font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+        .credential-box .value { font-size: 1.1rem; font-weight: 600; color: var(--dark); font-family: monospace; }
+        @media (max-width: 991px) { .sidebar-col { display: none; } }
+        .back-to-top { position: fixed; bottom: 24px; right: 24px; width: 44px; height: 44px; border-radius: 50%; background: var(--primary); color: #fff; border: none; box-shadow: 0 4px 12px rgba(59,130,246,0.3); display: none; align-items: center; justify-content: center; font-size: 1.2rem; z-index: 100; }
+    </style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="hero">
+    <div class="container">
+        <span class="badge-ver">v1.0</span>
+        <h1 class="mt-2"><i class="bi bi-mortarboard-fill me-2"></i>School Management System</h1>
+        <p class="mb-0 opacity-75">Complete Installation &amp; Deployment Guide</p>
+    </div>
+</div>
+
+<div class="container py-4">
+<div class="row">
+
+<!-- Sidebar Navigation -->
+<div class="col-lg-3 sidebar-col">
+    <div class="sidebar-nav">
+        <div class="nav-section">Web App</div>
+        <a href="#overview">Overview</a>
+        <a href="#requirements">Requirements</a>
+        <a href="#hostinger-install">Hostinger Installation</a>
+        <a href="#cpanel-install">cPanel Installation</a>
+        <a href="#manual-install">Manual / VPS Install</a>
+        <a href="#web-installer">Web Installer</a>
+        <a href="#configuration">Configuration</a>
+        <a href="#troubleshooting">Troubleshooting</a>
+        <div class="nav-section">Android App</div>
+        <a href="#android-overview">Overview</a>
+        <a href="#android-setup">Setup in Android Studio</a>
+        <a href="#android-config">Configuration</a>
+        <a href="#android-build">Build APK</a>
+        <a href="#android-publish">Publish to Play Store</a>
+        <div class="nav-section">Reference</div>
+        <a href="#features">Features List</a>
+        <a href="#default-login">Default Login</a>
+        <a href="#folder-structure">Folder Structure</a>
+        <a href="#security">Security Notes</a>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="col-lg-9">
+
+<!-- ==================== OVERVIEW ==================== -->
+<section class="content-section" id="overview">
+    <h2><i class="bi bi-info-circle me-2 text-primary"></i>Overview</h2>
+    <p>The <strong>School Management System</strong> is a complete web-based application built with <strong>Laravel (PHP)</strong> and <strong>MySQL</strong>. It provides tools for managing students, fees, attendance, homework, notices, report cards, leave applications, and more.</p>
+    <p>The system comes with:</p>
+    <ul>
+        <li><strong>Web Application</strong> &mdash; Full-featured responsive web app (looks like a native Android app on mobile)</li>
+        <li><strong>Android App</strong> &mdash; WebView-based Android wrapper for native app experience</li>
+        <li><strong>Web Installer</strong> &mdash; Browser-based setup wizard for easy deployment</li>
+    </ul>
+
+    <div class="feature-grid">
+        <div class="feature-item"><i class="bi bi-people-fill"></i>Student Management</div>
+        <div class="feature-item"><i class="bi bi-cash-stack"></i>Fee Management</div>
+        <div class="feature-item"><i class="bi bi-calendar-check-fill"></i>Attendance</div>
+        <div class="feature-item"><i class="bi bi-journal-text"></i>Homework</div>
+        <div class="feature-item"><i class="bi bi-file-earmark-bar-graph-fill"></i>Report Cards</div>
+        <div class="feature-item"><i class="bi bi-megaphone-fill"></i>Notices</div>
+        <div class="feature-item"><i class="bi bi-envelope-paper-fill"></i>Leave Applications</div>
+        <div class="feature-item"><i class="bi bi-download"></i>CSV &amp; PDF Export</div>
+    </div>
+</section>
+
+<!-- ==================== REQUIREMENTS ==================== -->
+<section class="content-section" id="requirements">
+    <h2><i class="bi bi-check2-square me-2 text-primary"></i>Server Requirements</h2>
+
+    <table class="table req-table table-bordered">
+        <thead class="table-light">
+            <tr><th>Requirement</th><th>Minimum</th><th>Recommended</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>PHP</td><td>8.1</td><td>8.2 or 8.3</td></tr>
+            <tr><td>MySQL</td><td>5.7</td><td>8.0</td></tr>
+            <tr><td>PHP Extensions</td><td colspan="2">pdo, pdo_mysql, mbstring, openssl, tokenizer, json, curl, fileinfo, gd</td></tr>
+            <tr><td>Disk Space</td><td>100 MB</td><td>500 MB+</td></tr>
+            <tr><td>Memory</td><td>128 MB</td><td>256 MB+</td></tr>
+        </tbody>
+    </table>
+
+    <div class="info-box">
+        <strong><i class="bi bi-lightbulb me-1"></i> Good News</strong>
+        Most shared hosting providers (Hostinger, GoDaddy, Bluehost, Namecheap) already meet all these requirements out of the box.
+    </div>
+</section>
+
+<!-- ==================== HOSTINGER INSTALL ==================== -->
+<section class="content-section" id="hostinger-install">
+    <h2><i class="bi bi-cloud-upload me-2 text-primary"></i>Hostinger Installation</h2>
+    <p>Follow these steps to deploy on Hostinger shared hosting:</p>
+
+    <ol class="steps">
+        <li>
+            <strong><span class="step-badge">1</span> Create a MySQL Database</strong>
+            <ul>
+                <li>Log into <strong>Hostinger hPanel</strong></li>
+                <li>Go to <strong>Databases &rarr; MySQL Databases</strong></li>
+                <li>Create a new database (e.g., <code>school_management</code>)</li>
+                <li>Note down: <strong>Database Name</strong>, <strong>Username</strong>, <strong>Password</strong>, and <strong>Host</strong> (usually <code>localhost</code>)</li>
+            </ul>
+        </li>
+
+        <li>
+            <strong><span class="step-badge">2</span> Upload Files</strong>
+            <ul>
+                <li>Go to <strong>Files &rarr; File Manager</strong></li>
+                <li>Navigate to <code>public_html</code> (or your domain's root folder)</li>
+                <li>Upload the <code>SchoolMS.zip</code> file</li>
+                <li>Right-click the zip &rarr; <strong>Extract</strong></li>
+                <li>You should now have: <code>public_html/installer.php</code> and <code>public_html/school-management/</code></li>
+            </ul>
+        </li>
+
+        <li>
+            <strong><span class="step-badge">3</span> Set Document Root (Important!)</strong>
+            <p>Laravel's entry point is the <code>public</code> folder. You need to point your domain to it:</p>
+
+            <ul class="nav nav-tabs" role="tablist">
+                <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#method-htaccess">Method 1: .htaccess (Easiest)</a></li>
+                <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#method-docroot">Method 2: Change Doc Root</a></li>
+            </ul>
+            <div class="tab-content">
+                <div class="tab-pane fade show active" id="method-htaccess">
+                    <p>Create a <code>.htaccess</code> file in <code>public_html/</code> with this content:</p>
+                    <div class="code-block">
+<span class="comment"># public_html/.htaccess</span>
+&lt;IfModule mod_rewrite.c&gt;
+    RewriteEngine On
+
+    <span class="comment"># Redirect all requests to school-management/public/</span>
+    RewriteRule ^$ <span class="string">school-management/public/</span> [L]
+    RewriteRule ^(<span class="string">.*</span>)$ <span class="string">school-management/public/$1</span> [L]
+&lt;/IfModule&gt;
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="method-docroot">
+                    <p>In Hostinger hPanel:</p>
+                    <ul>
+                        <li>Go to <strong>Websites &rarr; your domain &rarr; Advanced &rarr; Folder Index</strong></li>
+                        <li>Change the document root to <code>public_html/school-management/public</code></li>
+                    </ul>
+                </div>
+            </div>
+        </li>
+
+        <li>
+            <strong><span class="step-badge">4</span> Run the Web Installer</strong>
+            <ul>
+                <li>Open your browser and go to:<br><code>https://yourdomain.com/installer.php</code></li>
+                <li>The installer will check requirements, ask for database credentials, and set up everything</li>
+                <li>After installation, <strong>delete <code>installer.php</code></strong> for security</li>
+            </ul>
+        </li>
+
+        <li>
+            <strong><span class="step-badge">5</span> Set Folder Permissions</strong>
+            <p>If you get permission errors, set these folders to <code>775</code> via File Manager:</p>
+            <div class="code-block">
+school-management/storage/          &rarr; <span class="string">775</span>
+school-management/bootstrap/cache/  &rarr; <span class="string">775</span>
+            </div>
+        </li>
+    </ol>
+
+    <div class="info-box success">
+        <strong><i class="bi bi-check-circle me-1"></i> Done!</strong>
+        Your School Management System should now be live at your domain. Log in with the admin credentials you set during installation.
+    </div>
+</section>
+
+<!-- ==================== CPANEL INSTALL ==================== -->
+<section class="content-section" id="cpanel-install">
+    <h2><i class="bi bi-window-stack me-2 text-primary"></i>cPanel Installation (GoDaddy, Bluehost, etc.)</h2>
+    <p>If your hosting uses <strong>cPanel</strong> instead of hPanel:</p>
+
+    <ol class="steps">
+        <li>
+            <strong><span class="step-badge">1</span> Create Database</strong>
+            <ul>
+                <li>cPanel &rarr; <strong>MySQL Databases</strong></li>
+                <li>Create database, create user, add user to database with <strong>ALL PRIVILEGES</strong></li>
+            </ul>
+        </li>
+        <li>
+            <strong><span class="step-badge">2</span> Upload &amp; Extract</strong>
+            <ul>
+                <li>cPanel &rarr; <strong>File Manager</strong> &rarr; <code>public_html</code></li>
+                <li>Upload <code>SchoolMS.zip</code> and extract it</li>
+            </ul>
+        </li>
+        <li>
+            <strong><span class="step-badge">3</span> Set Document Root</strong>
+            <p>Create <code>.htaccess</code> in <code>public_html/</code> (same as Hostinger Method 1 above)</p>
+        </li>
+        <li>
+            <strong><span class="step-badge">4</span> Run Installer</strong>
+            <p>Visit <code>https://yourdomain.com/installer.php</code> and follow the wizard</p>
+        </li>
+    </ol>
+</section>
+
+<!-- ==================== MANUAL INSTALL ==================== -->
+<section class="content-section" id="manual-install">
+    <h2><i class="bi bi-terminal me-2 text-primary"></i>Manual / VPS Installation</h2>
+    <p>For VPS (DigitalOcean, AWS, Linode) or local development:</p>
+
+    <h3>Prerequisites</h3>
+    <div class="code-block">
+<span class="comment"># Install PHP 8.2+ with required extensions</span>
+<span class="cmd">sudo apt update</span>
+<span class="cmd">sudo apt install</span> php8.3 php8.3-cli php8.3-mysql php8.3-mbstring php8.3-xml php8.3-curl php8.3-zip php8.3-gd php8.3-fpm
+
+<span class="comment"># Install MySQL</span>
+<span class="cmd">sudo apt install</span> mysql-server
+
+<span class="comment"># Install Composer (if not installed)</span>
+<span class="cmd">curl -sS</span> https://getcomposer.org/installer | php
+<span class="cmd">sudo mv</span> composer.phar /usr/local/bin/composer
+    </div>
+
+    <h3>Setup Steps</h3>
+    <div class="code-block">
+<span class="comment"># 1. Extract or clone the project</span>
+<span class="cmd">cd</span> /var/www/
+<span class="cmd">unzip</span> SchoolMS.zip
+<span class="cmd">cd</span> school-management
+
+<span class="comment"># 2. Install PHP dependencies</span>
+<span class="cmd">composer install</span> --optimize-autoloader --no-dev
+
+<span class="comment"># 3. Copy and configure environment file</span>
+<span class="cmd">cp</span> .env.example .env
+<span class="cmd">nano</span> .env
+<span class="comment"># Update: DB_DATABASE, DB_USERNAME, DB_PASSWORD, APP_URL</span>
+
+<span class="comment"># 4. Generate application key</span>
+<span class="cmd">php artisan</span> key:generate
+
+<span class="comment"># 5. Create database</span>
+<span class="cmd">mysql -u root -p</span> -e "CREATE DATABASE school_management;"
+
+<span class="comment"># 6. Run migrations and seed</span>
+<span class="cmd">php artisan</span> migrate --seed
+
+<span class="comment"># 7. Set permissions</span>
+<span class="cmd">sudo chown -R</span> www-data:www-data storage bootstrap/cache
+<span class="cmd">sudo chmod -R</span> 775 storage bootstrap/cache
+
+<span class="comment"># 8. Optimize for production</span>
+<span class="cmd">php artisan</span> config:cache
+<span class="cmd">php artisan</span> route:cache
+<span class="cmd">php artisan</span> view:cache
+
+<span class="comment"># 9. Set up Nginx or Apache to point to the public/ folder</span>
+    </div>
+
+    <h3>Nginx Configuration</h3>
+    <div class="code-block">
+server {
+    listen <span class="string">80</span>;
+    server_name <span class="string">yourdomain.com</span>;
+    root <span class="string">/var/www/school-management/public</span>;
+
+    index index.php;
+
+    location / {
+        try_files $uri $uri/ <span class="string">/index.php?$query_string</span>;
+    }
+
+    location ~ \.php$ {
+        fastcgi_pass <span class="string">unix:/var/run/php/php8.3-fpm.sock</span>;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include <span class="string">fastcgi_params</span>;
+    }
+
+    location ~ /\.(?!well-known) {
+        deny all;
+    }
+}
+    </div>
+</section>
+
+<!-- ==================== WEB INSTALLER ==================== -->
+<section class="content-section" id="web-installer">
+    <h2><i class="bi bi-magic me-2 text-primary"></i>Web Installer Guide</h2>
+    <p>The web installer (<code>installer.php</code>) automates the entire setup process through your browser.</p>
+
+    <h3>How It Works</h3>
+    <ol>
+        <li><strong>Step 1:</strong> Checks server requirements (PHP version, extensions, folder permissions)</li>
+        <li><strong>Step 2:</strong> Asks for MySQL database credentials and tests the connection</li>
+        <li><strong>Step 3:</strong> Configures admin account and application URL</li>
+        <li><strong>Step 4:</strong> Creates <code>.env</code>, runs database migrations, creates admin user, optimizes caches</li>
+        <li><strong>Step 5:</strong> Installation complete!</li>
+    </ol>
+
+    <div class="info-box danger">
+        <strong><i class="bi bi-exclamation-triangle me-1"></i> Security Warning</strong>
+        <strong>Delete <code>installer.php</code> immediately after installation!</strong> Leaving it on the server is a security risk as anyone could re-install and overwrite your database.
+    </div>
+</section>
+
+<!-- ==================== CONFIGURATION ==================== -->
+<section class="content-section" id="configuration">
+    <h2><i class="bi bi-gear me-2 text-primary"></i>Configuration</h2>
+
+    <h3>Environment Variables (.env)</h3>
+    <p>Key settings in the <code>.env</code> file:</p>
+
+    <table class="table table-bordered">
+        <thead class="table-light">
+            <tr><th>Variable</th><th>Description</th><th>Example</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>APP_URL</code></td><td>Your full website URL</td><td><code>https://school.example.com</code></td></tr>
+            <tr><td><code>APP_ENV</code></td><td>Environment mode</td><td><code>production</code></td></tr>
+            <tr><td><code>APP_DEBUG</code></td><td>Show errors (set <strong>false</strong> in production!)</td><td><code>false</code></td></tr>
+            <tr><td><code>DB_HOST</code></td><td>MySQL server host</td><td><code>localhost</code></td></tr>
+            <tr><td><code>DB_DATABASE</code></td><td>Database name</td><td><code>school_management</code></td></tr>
+            <tr><td><code>DB_USERNAME</code></td><td>Database user</td><td><code>schoolms_user</code></td></tr>
+            <tr><td><code>DB_PASSWORD</code></td><td>Database password</td><td><code>your_password</code></td></tr>
+        </tbody>
+    </table>
+
+    <h3>After Installation</h3>
+    <p>Once installed, use the web interface to configure:</p>
+    <ul>
+        <li><strong>Classes</strong> &mdash; Settings &rarr; Classes (e.g., Class 1-12)</li>
+        <li><strong>Sections</strong> &mdash; Settings &rarr; Sections (e.g., Section A, B, C)</li>
+        <li><strong>Subjects</strong> &mdash; Settings &rarr; Subjects (e.g., Math, Science, English)</li>
+        <li><strong>Academic Year</strong> &mdash; Settings &rarr; Academic Years</li>
+    </ul>
+</section>
+
+<!-- ==================== TROUBLESHOOTING ==================== -->
+<section class="content-section" id="troubleshooting">
+    <h2><i class="bi bi-wrench me-2 text-primary"></i>Troubleshooting</h2>
+
+    <h3>Common Issues</h3>
+
+    <div class="accordion" id="troubleAccordion">
+        <div class="accordion-item">
+            <h2 class="accordion-header"><button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#t1">500 Internal Server Error</button></h2>
+            <div id="t1" class="accordion-collapse collapse" data-bs-parent="#troubleAccordion">
+                <div class="accordion-body">
+                    <ul>
+                        <li>Check that <code>storage/</code> and <code>bootstrap/cache/</code> folders have <strong>775</strong> permissions</li>
+                        <li>Ensure <code>.env</code> file exists and has correct database credentials</li>
+                        <li>Check PHP error logs: <code>storage/logs/laravel.log</code></li>
+                        <li>Run: <code>php artisan config:clear</code></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="accordion-item">
+            <h2 class="accordion-header"><button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#t2">Blank White Page</button></h2>
+            <div id="t2" class="accordion-collapse collapse" data-bs-parent="#troubleAccordion">
+                <div class="accordion-body">
+                    <ul>
+                        <li>Enable <code>APP_DEBUG=true</code> temporarily in <code>.env</code> to see errors</li>
+                        <li>Check if <code>APP_KEY</code> is set in <code>.env</code> — if not, run <code>php artisan key:generate</code></li>
+                        <li>Make sure <code>.htaccess</code> is properly redirecting to <code>school-management/public/</code></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="accordion-item">
+            <h2 class="accordion-header"><button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#t3">Database Connection Error</button></h2>
+            <div id="t3" class="accordion-collapse collapse" data-bs-parent="#troubleAccordion">
+                <div class="accordion-body">
+                    <ul>
+                        <li>Verify database credentials in <code>.env</code></li>
+                        <li>On shared hosting, the DB host might be different from <code>localhost</code> — check your hosting panel</li>
+                        <li>Make sure the database user has permissions on the database</li>
+                        <li>After changing <code>.env</code>, clear cache: <code>php artisan config:clear</code></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="accordion-item">
+            <h2 class="accordion-header"><button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#t4">CSS/JS Not Loading (Mixed Content)</button></h2>
+            <div id="t4" class="accordion-collapse collapse" data-bs-parent="#troubleAccordion">
+                <div class="accordion-body">
+                    <ul>
+                        <li>Set <code>APP_URL</code> to your full <strong>https://</strong> URL</li>
+                        <li>If using Cloudflare or SSL proxy, add to <code>.env</code>:<br><code>ASSET_URL=https://yourdomain.com</code></li>
+                        <li>Force HTTPS in <code>bootstrap/app.php</code> if behind a proxy</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="accordion-item">
+            <h2 class="accordion-header"><button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#t5">Installer Not Working / Can't Access</button></h2>
+            <div id="t5" class="accordion-collapse collapse" data-bs-parent="#troubleAccordion">
+                <div class="accordion-body">
+                    <ul>
+                        <li>Make sure <code>installer.php</code> is in the <strong>same directory</strong> as <code>school-management/</code> folder</li>
+                        <li>Access it directly: <code>https://yourdomain.com/installer.php</code> (not through the Laravel app)</li>
+                        <li>If .htaccess is already redirecting, temporarily rename it and access installer directly</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ==================== ANDROID OVERVIEW ==================== -->
+<section class="content-section" id="android-overview">
+    <h2><i class="bi bi-phone me-2 text-primary"></i>Android App Overview</h2>
+    <p>The Android app is a <strong>WebView wrapper</strong> that loads your school management web application inside a native Android shell. This gives users a native app feel with:</p>
+    <ul>
+        <li>App icon on the home screen</li>
+        <li>Splash screen on launch</li>
+        <li>Pull-to-refresh</li>
+        <li>Hardware back button navigation</li>
+        <li>Offline error screen with retry</li>
+        <li>No browser URL bar — feels like a native app</li>
+    </ul>
+</section>
+
+<!-- ==================== ANDROID SETUP ==================== -->
+<section class="content-section" id="android-setup">
+    <h2><i class="bi bi-code-square me-2 text-primary"></i>Android Studio Setup</h2>
+
+    <h3>Prerequisites</h3>
+    <ul>
+        <li><a href="https://developer.android.com/studio" target="_blank">Android Studio</a> (Arctic Fox or later)</li>
+        <li>Android SDK 34</li>
+        <li>Java 8+ (bundled with Android Studio)</li>
+    </ul>
+
+    <h3>Steps</h3>
+    <ol class="steps">
+        <li>
+            <strong><span class="step-badge">1</span> Open Project</strong>
+            <ul>
+                <li>Open Android Studio</li>
+                <li>Select <strong>File &rarr; Open</strong></li>
+                <li>Navigate to the <code>android-app/</code> folder and select it</li>
+                <li>Wait for Gradle sync to complete (this may take a few minutes the first time)</li>
+            </ul>
+        </li>
+        <li>
+            <strong><span class="step-badge">2</span> Configure Server URL</strong>
+            <p>Open <code>app/build.gradle</code> and change the <code>BASE_URL</code>:</p>
+            <div class="code-block">
+<span class="comment">// Change this to your actual server URL</span>
+buildConfigField <span class="string">"String"</span>, <span class="string">"BASE_URL"</span>, <span class="string">"\"https://yourschool.com\""</span>
+
+<span class="comment">// For local development with emulator:</span>
+<span class="comment">// buildConfigField "String", "BASE_URL", "\"http://10.0.2.2:8000\""</span>
+            </div>
+        </li>
+        <li>
+            <strong><span class="step-badge">3</span> Run on Device/Emulator</strong>
+            <ul>
+                <li>Connect an Android phone via USB (enable USB Debugging in Developer Options)</li>
+                <li>Or create an AVD (Android Virtual Device) emulator</li>
+                <li>Click the <strong>Run</strong> button (green triangle) or press <strong>Shift+F10</strong></li>
+            </ul>
+        </li>
+    </ol>
+</section>
+
+<!-- ==================== ANDROID CONFIG ==================== -->
+<section class="content-section" id="android-config">
+    <h2><i class="bi bi-sliders me-2 text-primary"></i>Android App Configuration</h2>
+
+    <h3>Change App Name</h3>
+    <p>Edit <code>app/src/main/res/values/strings.xml</code>:</p>
+    <div class="code-block">
+&lt;string name=<span class="string">"app_name"</span>&gt;<span class="string">Your School Name</span>&lt;/string&gt;
+    </div>
+
+    <h3>Change App Colors</h3>
+    <p>Edit <code>app/src/main/res/values/colors.xml</code>:</p>
+    <div class="code-block">
+&lt;color name=<span class="string">"primary"</span>&gt;<span class="string">#3b82f6</span>&lt;/color&gt;      <span class="comment">&lt;!-- Main color --&gt;</span>
+&lt;color name=<span class="string">"primary_dark"</span>&gt;<span class="string">#2563eb</span>&lt;/color&gt; <span class="comment">&lt;!-- Status bar --&gt;</span>
+    </div>
+
+    <h3>Change App Icon</h3>
+    <p>Replace the icon files in the <code>mipmap</code> folders, or use Android Studio's <strong>Image Asset Studio</strong>:</p>
+    <ul>
+        <li>Right-click <code>res</code> folder &rarr; <strong>New &rarr; Image Asset</strong></li>
+        <li>Select your school logo and generate all sizes automatically</li>
+    </ul>
+
+    <h3>Change Package Name (for Play Store)</h3>
+    <p>If you want a unique package name (required for Play Store):</p>
+    <ol>
+        <li>In <code>app/build.gradle</code>, change <code>applicationId</code>:<br>
+            <code>applicationId "com.yourschool.management"</code></li>
+        <li>Refactor the Java package: right-click on <code>com.schoolms.app</code> in the project tree &rarr; <strong>Refactor &rarr; Rename</strong></li>
+    </ol>
+</section>
+
+<!-- ==================== ANDROID BUILD ==================== -->
+<section class="content-section" id="android-build">
+    <h2><i class="bi bi-box me-2 text-primary"></i>Build APK</h2>
+
+    <h3>Debug APK (for testing)</h3>
+    <div class="code-block">
+<span class="comment"># From command line (in android-app/ folder):</span>
+<span class="cmd">./gradlew</span> assembleDebug
+
+<span class="comment"># APK location:</span>
+app/build/outputs/apk/debug/<span class="string">app-debug.apk</span>
+    </div>
+
+    <h3>Signed Release APK (for distribution)</h3>
+    <ol class="steps">
+        <li>
+            <strong><span class="step-badge">1</span> Generate Keystore</strong>
+            <p>In Android Studio: <strong>Build &rarr; Generate Signed Bundle / APK</strong></p>
+            <ul>
+                <li>Select <strong>APK</strong></li>
+                <li>Click <strong>Create new...</strong> to create a keystore</li>
+                <li>Fill in the details and save the keystore file securely</li>
+            </ul>
+        </li>
+        <li>
+            <strong><span class="step-badge">2</span> Build Signed APK</strong>
+            <ul>
+                <li>Select the keystore you just created</li>
+                <li>Choose <strong>release</strong> build type</li>
+                <li>Click <strong>Finish</strong></li>
+            </ul>
+        </li>
+        <li>
+            <strong><span class="step-badge">3</span> Find the APK</strong>
+            <p>The signed APK will be at:<br><code>app/build/outputs/apk/release/app-release.apk</code></p>
+        </li>
+    </ol>
+
+    <div class="info-box warning">
+        <strong><i class="bi bi-key me-1"></i> Important</strong>
+        Keep your keystore file safe! You need it to publish updates to the Play Store. If you lose it, you cannot update your app.
+    </div>
+</section>
+
+<!-- ==================== ANDROID PUBLISH ==================== -->
+<section class="content-section" id="android-publish">
+    <h2><i class="bi bi-google-play me-2 text-primary"></i>Publish to Play Store</h2>
+    <ol>
+        <li>Create a <a href="https://play.google.com/console" target="_blank">Google Play Console</a> developer account ($25 one-time fee)</li>
+        <li>Create a new app and fill in the listing details (title, description, screenshots)</li>
+        <li>Upload the signed APK or App Bundle</li>
+        <li>Complete the content rating questionnaire</li>
+        <li>Set pricing (free) and distribution countries</li>
+        <li>Submit for review</li>
+    </ol>
+
+    <div class="info-box">
+        <strong><i class="bi bi-camera me-1"></i> Screenshots Tip</strong>
+        Take screenshots of the app on your phone (Power + Volume Down) and upload them to the Play Store listing. You need at least 2 screenshots.
+    </div>
+</section>
+
+<!-- ==================== FEATURES ==================== -->
+<section class="content-section" id="features">
+    <h2><i class="bi bi-stars me-2 text-primary"></i>Features List</h2>
+
+    <div class="row">
+        <div class="col-md-6">
+            <h3>Student Management</h3>
+            <ul>
+                <li>Add, edit, delete students</li>
+                <li>Student profiles with photo, contact, parent info</li>
+                <li>Class and section assignment</li>
+                <li>Search and filter students</li>
+                <li>CSV &amp; PDF export</li>
+            </ul>
+
+            <h3>Fee Management</h3>
+            <ul>
+                <li>Fee categories (Tuition, Transport, Lab, etc.)</li>
+                <li>Fee structures per class</li>
+                <li>Payment recording and receipts</li>
+                <li>Payment history and reports</li>
+            </ul>
+
+            <h3>Attendance</h3>
+            <ul>
+                <li>Daily attendance marking</li>
+                <li>Class/section-wise attendance</li>
+                <li>Attendance reports with date range</li>
+                <li>CSV export</li>
+            </ul>
+
+            <h3>Homework</h3>
+            <ul>
+                <li>Assign homework per class/section/subject</li>
+                <li>Due date tracking</li>
+                <li>Submission management</li>
+                <li>Grading and feedback</li>
+            </ul>
+        </div>
+        <div class="col-md-6">
+            <h3>Report Cards &amp; Exams</h3>
+            <ul>
+                <li>Create exams</li>
+                <li>Enter marks per subject</li>
+                <li>Auto-calculate totals and percentages</li>
+                <li>View and print report cards</li>
+                <li>PDF report card export</li>
+            </ul>
+
+            <h3>Notices</h3>
+            <ul>
+                <li>Create and publish notices</li>
+                <li>Audience targeting (all, teachers, students, parents)</li>
+                <li>Notice history</li>
+            </ul>
+
+            <h3>Leave Applications</h3>
+            <ul>
+                <li>Submit leave requests</li>
+                <li>Approve/reject workflow</li>
+                <li>Leave history</li>
+            </ul>
+
+            <h3>Settings (Admin Only)</h3>
+            <ul>
+                <li>Manage classes</li>
+                <li>Manage sections</li>
+                <li>Manage subjects</li>
+                <li>Academic year management</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<!-- ==================== DEFAULT LOGIN ==================== -->
+<section class="content-section" id="default-login">
+    <h2><i class="bi bi-key me-2 text-primary"></i>Default Login Credentials</h2>
+    <p>If you used the <strong>DatabaseSeeder</strong> (manual install with <code>--seed</code>):</p>
+
+    <div class="credential-box">
+        <div class="label">Email</div>
+        <div class="value">admin@school.com</div>
+        <div class="label mt-2">Password</div>
+        <div class="value">password</div>
+    </div>
+
+    <div class="info-box danger mt-3">
+        <strong><i class="bi bi-exclamation-triangle me-1"></i> Change Immediately!</strong>
+        Change the default password after first login. If you used the web installer, you already set your own credentials.
+    </div>
+</section>
+
+<!-- ==================== FOLDER STRUCTURE ==================== -->
+<section class="content-section" id="folder-structure">
+    <h2><i class="bi bi-folder2-open me-2 text-primary"></i>Folder Structure</h2>
+    <div class="code-block" style="font-size: 0.82rem;">
+SchoolMS.zip
+├── <span class="string">installer.php</span>           <span class="comment"># Web installer (delete after install)</span>
+├── <span class="string">INSTALLATION-GUIDE.html</span>  <span class="comment"># This guide</span>
+├── <span class="string">school-management/</span>       <span class="comment"># Laravel application</span>
+│   ├── app/                    <span class="comment"># Application code</span>
+│   │   ├── Http/Controllers/   <span class="comment"># Route handlers</span>
+│   │   ├── Models/             <span class="comment"># Database models</span>
+│   │   └── Http/Middleware/    <span class="comment"># Auth middleware</span>
+│   ├── bootstrap/              <span class="comment"># App bootstrap</span>
+│   ├── config/                 <span class="comment"># Configuration files</span>
+│   ├── database/
+│   │   ├── migrations/         <span class="comment"># Database schema</span>
+│   │   └── seeders/            <span class="comment"># Demo data</span>
+│   ├── public/                 <span class="comment"># Web root (point domain here)</span>
+│   │   ├── index.php           <span class="comment"># Entry point</span>
+│   │   ├── manifest.json       <span class="comment"># PWA manifest</span>
+│   │   └── sw.js               <span class="comment"># Service worker</span>
+│   ├── resources/views/        <span class="comment"># Blade templates</span>
+│   ├── routes/web.php          <span class="comment"># URL routes</span>
+│   ├── storage/                <span class="comment"># Logs, cache, uploads</span>
+│   └── vendor/                 <span class="comment"># PHP dependencies</span>
+└── <span class="string">android-app/</span>             <span class="comment"># Android WebView project</span>
+    ├── app/src/main/
+    │   ├── java/.../            <span class="comment"># Java source code</span>
+    │   ├── res/                 <span class="comment"># Android resources</span>
+    │   └── AndroidManifest.xml
+    ├── build.gradle
+    └── README.md
+    </div>
+</section>
+
+<!-- ==================== SECURITY ==================== -->
+<section class="content-section" id="security">
+    <h2><i class="bi bi-shield-check me-2 text-primary"></i>Security Notes</h2>
+    <ul>
+        <li><strong>Delete <code>installer.php</code></strong> after installation</li>
+        <li>Set <code>APP_DEBUG=false</code> in production</li>
+        <li>Set <code>APP_ENV=production</code></li>
+        <li>Use strong admin passwords</li>
+        <li>Keep PHP and Laravel updated</li>
+        <li>Use <strong>HTTPS</strong> (most hosting provides free SSL via Let's Encrypt)</li>
+        <li>The <code>.env</code> file should never be publicly accessible (Laravel's <code>public/</code> folder protects this)</li>
+        <li>Regularly backup your database</li>
+    </ul>
+
+    <div class="info-box">
+        <strong><i class="bi bi-database me-1"></i> Backup Tip</strong>
+        Most hosting panels have automatic backup options. Enable daily backups for your database and files.
+    </div>
+</section>
+
+</div><!-- /col-lg-9 -->
+</div><!-- /row -->
+</div><!-- /container -->
+
+<!-- Footer -->
+<div class="text-center py-4 text-muted" style="border-top: 1px solid #e2e8f0; background: #fff;">
+    <small>School Management System v1.0 &mdash; Installation Guide</small>
+</div>
+
+<!-- Back to top -->
+<button class="back-to-top" id="backToTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+    <i class="bi bi-chevron-up"></i>
+</button>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// Back to top button
+window.addEventListener('scroll', function() {
+    var btn = document.getElementById('backToTop');
+    btn.style.display = window.scrollY > 300 ? 'flex' : 'none';
+});
+
+// Active sidebar nav
+var sections = document.querySelectorAll('.content-section');
+var navLinks = document.querySelectorAll('.sidebar-nav a');
+window.addEventListener('scroll', function() {
+    var scrollPos = window.scrollY + 100;
+    sections.forEach(function(section) {
+        if (scrollPos >= section.offsetTop && scrollPos < section.offsetTop + section.offsetHeight) {
+            navLinks.forEach(function(link) { link.classList.remove('active'); });
+            var activeLink = document.querySelector('.sidebar-nav a[href="#' + section.id + '"]');
+            if (activeLink) activeLink.classList.add('active');
+        }
+    });
+});
+</script>
+</body>
+</html>

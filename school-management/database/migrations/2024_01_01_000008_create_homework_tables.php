@@ -25,7 +25,7 @@ return new class extends Migration
 
         Schema::create('homework_submissions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('homework_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('homework_id')->constrained('homeworks')->cascadeOnDelete();
             $table->foreignId('student_id')->constrained()->cascadeOnDelete();
             $table->text('submission_text')->nullable();
             $table->string('attachment')->nullable();

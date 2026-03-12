@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SchoolMS</string>
+    <string name="no_connection">No Internet Connection</string>
+    <string name="check_connection">Please check your internet connection and try again.</string>
+    <string name="retry">Retry</string>
+</resources>
