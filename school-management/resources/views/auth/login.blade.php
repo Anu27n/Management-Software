@@ -103,7 +103,8 @@
         </form>
 
         <div class="text-center mt-3">
-            <small class="text-muted">Default: admin@school.com / password</small>
+            <small class="text-muted d-block">Default admin: admin@school.com / password</small>
+            <small class="text-muted">Teacher/Parent/Student accounts are created by admin from Settings > User Accounts.</small>
         </div>
     </div>
 </body>

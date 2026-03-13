@@ -9,7 +9,9 @@ class RoleMiddleware
 {
     public function handle(Request $request, Closure $next, string ...$roles): mixed
     {
-        if (!$request->user() || !in_array($request->user()->role, $roles)) {
+        $user = $request->user();
+
+        if (!$user || !$user->hasAnyRole($roles)) {
             abort(403, 'Unauthorized.');
         }
 

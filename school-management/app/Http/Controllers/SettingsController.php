@@ -6,7 +6,10 @@ use App\Models\SchoolClass;
 use App\Models\Section;
 use App\Models\Subject;
 use App\Models\AcademicYear;
+use App\Models\NotificationSetting;
+use App\Models\PaymentGatewaySetting;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class SettingsController extends Controller
 {
@@ -111,5 +114,90 @@ class SettingsController extends Controller
     {
         $year->delete();
         return redirect()->route('settings.academic-years')->with('success', 'Academic year deleted.');
+    }
+
+    public function notifications()
+    {
+        $settings = NotificationSetting::firstOrCreate([], [
+            'mail_enabled' => false,
+            'sms_enabled' => false,
+        ]);
+
+        return view('settings.notifications', compact('settings'));
+    }
+
+    public function updateNotifications(Request $request)
+    {
+        $validated = $request->validate([
+            'mail_from_name' => 'nullable|string|max:255',
+            'mail_from_address' => 'nullable|email|max:255',
+            'mail_host' => 'nullable|string|max:255',
+            'mail_port' => 'nullable|integer|min:1|max:65535',
+            'mail_username' => 'nullable|string|max:255',
+            'mail_password' => 'nullable|string|max:255',
+            'mail_encryption' => 'nullable|in:tls,ssl,none',
+            'sms_provider' => 'nullable|string|max:255',
+            'sms_sender_id' => 'nullable|string|max:50',
+            'sms_api_key' => 'nullable|string|max:255',
+            'sms_api_secret' => 'nullable|string|max:255',
+        ]);
+
+        $settings = NotificationSetting::firstOrCreate([]);
+        $settings->update([
+            ...$validated,
+            'mail_enabled' => $request->boolean('mail_enabled'),
+            'mail_encryption' => $request->input('mail_encryption') === 'none' ? null : $request->input('mail_encryption'),
+            'sms_enabled' => $request->boolean('sms_enabled'),
+        ]);
+
+        return redirect()->route('settings.notifications')->with('success', 'Notification settings updated.');
+    }
+
+    public function paymentGateway()
+    {
+        $settings = PaymentGatewaySetting::firstOrCreate(
+            ['provider' => 'razorpay'],
+            [
+                'display_name' => 'Razorpay',
+                'is_enabled' => false,
+                'test_mode' => true,
+                'currency' => 'INR',
+            ]
+        );
+
+        return view('settings.payment-gateway', compact('settings'));
+    }
+
+    public function updatePaymentGateway(Request $request)
+    {
+        $settings = PaymentGatewaySetting::firstOrCreate(['provider' => 'razorpay']);
+        $requiresCredentials = $request->boolean('is_enabled')
+            && (blank($settings->key_id) || blank($settings->key_secret));
+
+        $validated = $request->validate([
+            'is_enabled' => 'required|boolean',
+            'test_mode' => 'required|boolean',
+            'display_name' => 'required|string|max:255',
+            'key_id' => ['nullable', 'string', 'max:255', Rule::requiredIf($requiresCredentials)],
+            'key_secret' => ['nullable', 'string', 'max:255', Rule::requiredIf($requiresCredentials)],
+            'webhook_secret' => 'nullable|string|max:255',
+            'currency' => 'required|string|size:3',
+            'description' => 'nullable|string|max:500',
+        ]);
+
+        $settings->update([
+            'display_name' => $validated['display_name'],
+            'is_enabled' => $request->boolean('is_enabled'),
+            'test_mode' => $request->boolean('test_mode'),
+            'key_id' => $validated['key_id'] ?? $settings->key_id,
+            'key_secret' => $validated['key_secret'] ?? $settings->key_secret,
+            'webhook_secret' => $validated['webhook_secret'] ?? $settings->webhook_secret,
+            'currency' => strtoupper($validated['currency']),
+            'description' => $validated['description'] ?? null,
+        ]);
+
+        return redirect()
+            ->route('settings.payment-gateway')
+            ->with('success', 'Payment gateway settings updated.');
     }
 }

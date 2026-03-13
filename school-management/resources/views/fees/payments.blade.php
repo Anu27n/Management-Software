@@ -4,9 +4,14 @@
 
 @section('content')
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-    <div class="btn-group btn-group-sm">
-        <a href="{{ route('fees.categories') }}" class="btn btn-outline-primary">Categories</a>
-        <a href="{{ route('fees.structures') }}" class="btn btn-outline-primary">Structures</a>
+    <div>
+        @if(auth()->user()->hasPermission('fees.manage'))
+            <div class="btn-group btn-group-sm">
+                <a href="{{ route('fees.categories') }}" class="btn btn-outline-primary">Categories</a>
+                <a href="{{ route('fees.structures') }}" class="btn btn-outline-primary">Structures</a>
+                <a href="{{ route('settings.payment-gateway') }}" class="btn btn-outline-primary">Payment Gateway</a>
+            </div>
+        @endif
     </div>
     <div class="d-flex gap-2">
         <div class="btn-group btn-group-sm">

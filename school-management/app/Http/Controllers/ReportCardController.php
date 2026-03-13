@@ -14,6 +14,7 @@ class ReportCardController extends Controller
 {
     public function exams()
     {
+        $this->ensureCanManageReportCards();
         $exams = Exam::with('academicYear')->latest()->paginate(20);
         $academicYears = AcademicYear::all();
         return view('reportcards.exams', compact('exams', 'academicYears'));
@@ -21,6 +22,8 @@ class ReportCardController extends Controller
 
     public function storeExam(Request $request)
     {
+        $this->ensureCanManageReportCards();
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'academic_year_id' => 'required|exists:academic_years,id',
@@ -34,12 +37,15 @@ class ReportCardController extends Controller
 
     public function destroyExam(Exam $exam)
     {
+        $this->ensureCanManageReportCards();
         $exam->delete();
         return redirect()->route('reportcards.exams')->with('success', 'Exam deleted.');
     }
 
     public function enterMarks(Request $request)
     {
+        $this->ensureCanManageReportCards();
+
         $exams = Exam::all();
         $classes = SchoolClass::with('sections')->get();
         $students = collect();
@@ -76,6 +82,8 @@ class ReportCardController extends Controller
 
     public function storeMarks(Request $request)
     {
+        $this->ensureCanManageReportCards();
+
         $request->validate([
             'exam_id' => 'required|exists:exams,id',
             'subject_id' => 'required|exists:subjects,id',
@@ -108,15 +116,42 @@ class ReportCardController extends Controller
         return redirect()->back()->with('success', 'Marks saved successfully.');
     }
 
+    public function classLookups(SchoolClass $class)
+    {
+        $this->ensureCanManageReportCards();
+
+        $sections = $class->sections()->orderBy('name')->get(['id', 'name']);
+        $subjects = Subject::where('class_id', $class->id)->orderBy('name')->get(['id', 'name']);
+
+        return response()->json([
+            'sections' => $sections,
+            'subjects' => $subjects,
+        ]);
+    }
+
     public function viewReportCard(Request $request)
     {
+        $user = auth()->user();
+
         $exams = Exam::all();
-        $students = Student::where('status', 'active')->orderBy('first_name')->get();
+        $students = Student::query()->where('status', 'active');
+
+        if ($user->isParent()) {
+            $students->where('parent_user_id', $user->id);
+        }
+
+        if ($user->isStudent()) {
+            $students->where('email', $user->email);
+        }
+
+        $students = $students->orderBy('first_name')->get();
         $student = null;
         $results = collect();
         $selectedExam = null;
 
         if ($request->filled('student_id') && $request->filled('exam_id')) {
+            abort_unless($students->contains('id', (int) $request->student_id), 403, 'Unauthorized.');
+
             $selectedExam = Exam::find($request->exam_id);
             $student = Student::with(['schoolClass', 'section', 'academicYear'])->find($request->student_id);
             $results = ExamResult::with('subject')
@@ -139,5 +174,11 @@ class ReportCardController extends Controller
             $percentage >= 40 => 'D',
             default => 'F',
         };
+    }
+
+    private function ensureCanManageReportCards(): void
+    {
+        $user = auth()->user();
+        abort_unless($user && $user->hasPermission('reportcards.manage'), 403, 'Unauthorized.');
     }
 }

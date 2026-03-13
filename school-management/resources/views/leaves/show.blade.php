@@ -14,20 +14,32 @@
             </div>
             <div class="card-body">
                 <table class="table table-borderless mb-0">
-                    <tr><td class="text-muted" style="width:140px">Applicant</td><td class="fw-semibold">{{ $leave->user->name }}</td></tr>
-                    <tr><td class="text-muted">Role</td><td>{{ ucfirst($leave->user->role) }}</td></tr>
-                    <tr><td class="text-muted">Leave Type</td><td>{{ $leave->leave_type }}</td></tr>
-                    <tr><td class="text-muted">From</td><td>{{ $leave->start_date->format('M d, Y') }}</td></tr>
-                    <tr><td class="text-muted">To</td><td>{{ $leave->end_date->format('M d, Y') }}</td></tr>
-                    <tr><td class="text-muted">Duration</td><td>{{ $leave->start_date->diffInDays($leave->end_date) + 1 }} day(s)</td></tr>
+                    <tr><td class="text-muted" style="width:160px">Student</td><td class="fw-semibold">{{ $leave->student->full_name ?? '-' }}</td></tr>
+                    <tr><td class="text-muted">Class / Section</td><td>{{ $leave->schoolClass->name ?? '-' }} / {{ $leave->section->name ?? '-' }}</td></tr>
+                    <tr><td class="text-muted">From</td><td>{{ $leave->from_date->format('M d, Y') }}</td></tr>
+                    <tr><td class="text-muted">To</td><td>{{ $leave->to_date->format('M d, Y') }}</td></tr>
+                    <tr><td class="text-muted">Duration</td><td>{{ $leave->from_date->diffInDays($leave->to_date) + 1 }} day(s)</td></tr>
                     <tr><td class="text-muted">Reason</td><td>{{ $leave->reason }}</td></tr>
+                    @if($leave->description)
+                        <tr><td class="text-muted">Description</td><td>{{ $leave->description }}</td></tr>
+                    @endif
+                    @if($leave->attachment)
+                        <tr>
+                            <td class="text-muted">Attachment</td>
+                            <td><a href="{{ asset('storage/' . $leave->attachment) }}" target="_blank" class="btn btn-sm btn-outline-primary">View Attachment</a></td>
+                        </tr>
+                    @endif
+                    <tr><td class="text-muted">Applied By</td><td>{{ $leave->appliedBy->name ?? '-' }}</td></tr>
                     <tr><td class="text-muted">Applied On</td><td>{{ $leave->created_at->format('M d, Y h:i A') }}</td></tr>
+                    @if($leave->responded_at)
+                        <tr><td class="text-muted">Responded On</td><td>{{ $leave->responded_at->format('M d, Y h:i A') }}</td></tr>
+                    @endif
                     @if($leave->admin_remarks)
-                    <tr><td class="text-muted">Admin Remarks</td><td>{{ $leave->admin_remarks }}</td></tr>
+                    <tr><td class="text-muted">Remarks</td><td>{{ $leave->admin_remarks }}</td></tr>
                     @endif
                 </table>
             </div>
-            @if(auth()->user()->isAdmin() && $leave->status == 'pending')
+            @if(auth()->user()->hasPermission('leaves.approve') && $leave->status == 'pending')
             <div class="card-footer bg-white d-flex gap-2">
                 <form method="POST" action="{{ route('leaves.approve', $leave) }}" class="flex-fill">
                     @csrf

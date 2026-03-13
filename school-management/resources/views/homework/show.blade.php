@@ -4,7 +4,7 @@
 
 @section('content')
 <div class="row g-3">
-    <div class="col-lg-8">
+    <div class="{{ auth()->user()->hasPermission('homework.manage') ? 'col-lg-8' : 'col-12' }}">
         <div class="card table-card">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-semibold">{{ $homework->title }}</h6>
@@ -30,30 +30,34 @@
             </div>
         </div>
     </div>
-    <div class="col-lg-4">
-        <div class="card table-card">
-            <div class="card-header bg-white"><h6 class="mb-0 fw-semibold">Submissions ({{ $homework->submissions->count() }})</h6></div>
-            <div class="list-group list-group-flush">
-                @forelse($homework->submissions as $sub)
-                <div class="list-group-item">
-                    <div class="d-flex justify-content-between">
-                        <span class="fw-semibold">{{ $sub->student->full_name }}</span>
-                        <span class="badge bg-{{ $sub->status == 'graded' ? 'success' : ($sub->status == 'late' ? 'warning' : 'primary') }}">{{ ucfirst($sub->status) }}</span>
+    @if(auth()->user()->hasPermission('homework.manage'))
+        <div class="col-lg-4">
+            <div class="card table-card">
+                <div class="card-header bg-white"><h6 class="mb-0 fw-semibold">Submissions ({{ $homework->submissions->count() }})</h6></div>
+                <div class="list-group list-group-flush">
+                    @forelse($homework->submissions as $sub)
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between">
+                            <span class="fw-semibold">{{ $sub->student->full_name }}</span>
+                            <span class="badge bg-{{ $sub->status == 'graded' ? 'success' : ($sub->status == 'late' ? 'warning' : 'primary') }}">{{ ucfirst($sub->status) }}</span>
+                        </div>
+                        @if($sub->grade)
+                        <small class="text-muted">Grade: {{ $sub->grade }}</small>
+                        @endif
                     </div>
-                    @if($sub->grade)
-                    <small class="text-muted">Grade: {{ $sub->grade }}</small>
-                    @endif
+                    @empty
+                    <div class="list-group-item text-center text-muted py-3">No submissions</div>
+                    @endforelse
                 </div>
-                @empty
-                <div class="list-group-item text-center text-muted py-3">No submissions</div>
-                @endforelse
             </div>
         </div>
-    </div>
+    @endif
 </div>
 
 <div class="mt-3 d-flex gap-2">
-    <a href="{{ route('homework.edit', $homework) }}" class="btn btn-warning"><i class="bi bi-pencil me-1"></i>Edit</a>
+    @if(auth()->user()->hasPermission('homework.manage'))
+        <a href="{{ route('homework.edit', $homework) }}" class="btn btn-warning"><i class="bi bi-pencil me-1"></i>Edit</a>
+    @endif
     <a href="{{ route('homework.index') }}" class="btn btn-secondary">Back</a>
 </div>
 @endsection

@@ -10,6 +10,45 @@ session_start();
 // Prevent access after installation is complete
 $lockFile = __DIR__ . '/school-management/.installed';
 
+if (file_exists($lockFile)) {
+    $installedUrl = discoverInstalledAppUrl();
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Installer Locked</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+        <style>
+            body { background: #f1f5f9; font-family: 'Segoe UI', system-ui, sans-serif; }
+            .card-wrap { max-width: 620px; margin: 60px auto; border: none; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+            .card-head { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; border-radius: 16px 16px 0 0; }
+        </style>
+    </head>
+    <body>
+        <div class="card card-wrap">
+            <div class="card-body p-4 card-head">
+                <h4 class="mb-1"><i class="bi bi-shield-lock me-2"></i>Installer Locked</h4>
+                <p class="mb-0 opacity-75">This application is already installed.</p>
+            </div>
+            <div class="card-body p-4">
+                <div class="alert alert-success mb-3">
+                    Installation lock file exists: <code>school-management/.installed</code>
+                </div>
+                <p class="mb-3">For security, reinstall is disabled by default. If you need a fresh install, delete the lock file and run again.</p>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-primary" href="<?= htmlspecialchars($installedUrl, ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-box-arrow-in-right me-1"></i>Open Application</a>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
 $step = isset($_GET['step']) ? (int)$_GET['step'] : 1;
 $errors = [];
 $success = '';
@@ -18,7 +57,12 @@ $success = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    if ($action === 'check_requirements') {
+    if ($action === 'fix_permissions') {
+        tryFixPermissions();
+        // Reload page so fresh check runs
+        header('Location: installer.php?step=1&fixed=1');
+        exit;
+    } elseif ($action === 'check_requirements') {
         $step = 2;
     } elseif ($action === 'save_database') {
         $dbHost = trim($_POST['db_host'] ?? '127.0.0.1');
@@ -113,15 +157,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (empty($errors)) {
                 // Step 2: Run artisan commands
-                $phpBin = PHP_BINARY;
-                $artisan = $basePath . '/artisan';
-
                 // Clear caches
-                exec("{$phpBin} {$artisan} config:clear 2>&1", $out1, $ret1);
-                exec("{$phpBin} {$artisan} cache:clear 2>&1", $out2, $ret2);
+                runArtisanCommand($basePath, 'config:clear', $out1);
+                runArtisanCommand($basePath, 'cache:clear', $out2);
 
                 // Run migrations
-                exec("{$phpBin} {$artisan} migrate:fresh --force 2>&1", $migrationOutput, $migRet);
+                $migRet = runArtisanCommand($basePath, 'migrate --force', $migrationOutput);
                 if ($migRet !== 0) {
                     $errors[] = 'Migration failed: ' . htmlspecialchars(implode("\n", $migrationOutput), ENT_QUOTES, 'UTF-8');
                 }
@@ -164,16 +205,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     @chmod($fullPath, 0775);
                 }
 
+                // Create public storage symlink if possible
+                $storageLinkOutput = [];
+                $storageLinkRet = runArtisanCommand($basePath, 'storage:link --relative', $storageLinkOutput);
+                if ($storageLinkRet !== 0) {
+                    $storageLinkRet = runArtisanCommand($basePath, 'storage:link', $storageLinkOutput);
+                }
+
                 // Optimize for production
-                exec("{$phpBin} {$artisan} config:cache 2>&1");
-                exec("{$phpBin} {$artisan} route:cache 2>&1");
-                exec("{$phpBin} {$artisan} view:cache 2>&1");
+                runArtisanCommand($basePath, 'config:cache');
+                runArtisanCommand($basePath, 'route:cache');
+                runArtisanCommand($basePath, 'view:cache');
 
                 // Write lock file
                 file_put_contents($lockFile, date('Y-m-d H:i:s') . ' - Installed');
 
+                $_SESSION['installed_url'] = $admin['url'];
+
                 // Clear session
-                session_destroy();
                 $step = 5;
                 $success = 'Installation completed successfully!';
             } else {
@@ -181,6 +230,88 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     }
+}
+
+// Auto-fix folder permissions (safe to run at any time)
+function tryFixPermissions() {
+    $basePath = __DIR__ . '/school-management';
+
+    // Directories that need to be writable
+    $dirs = [
+        $basePath . '/storage',
+        $basePath . '/storage/app',
+        $basePath . '/storage/app/public',
+        $basePath . '/storage/framework',
+        $basePath . '/storage/framework/cache',
+        $basePath . '/storage/framework/sessions',
+        $basePath . '/storage/framework/views',
+        $basePath . '/storage/logs',
+        $basePath . '/bootstrap/cache',
+    ];
+
+    foreach ($dirs as $dir) {
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0755, true);
+        }
+        @chmod($dir, 0755);
+    }
+
+    // .env: touch it if it doesn't exist so it becomes writable
+    $envFile = $basePath . '/.env';
+    if (!file_exists($envFile)) {
+        @touch($envFile);
+        @chmod($envFile, 0644);
+    } else {
+        @chmod($envFile, 0644);
+    }
+
+    return true;
+}
+
+function runArtisanCommand(string $basePath, string $command, array &$output = []): int
+{
+    $output = [];
+
+    try {
+        static $kernel = null;
+
+        if ($kernel === null) {
+            require_once $basePath . '/vendor/autoload.php';
+            $app = require $basePath . '/bootstrap/app.php';
+            $kernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
+        }
+
+        $status = (int) $kernel->call($command);
+        $commandOutput = trim((string) $kernel->output());
+        if ($commandOutput !== '') {
+            $output = preg_split('/\r\n|\r|\n/', $commandOutput) ?: [];
+        }
+
+        return $status;
+    } catch (\Throwable $e) {
+        $output[] = $e->getMessage();
+        return 1;
+    }
+}
+
+function discoverInstalledAppUrl(): string
+{
+    $envPath = __DIR__ . '/school-management/.env';
+    if (is_file($envPath)) {
+        $env = file_get_contents($envPath);
+        if (is_string($env) && preg_match('/^APP_URL=(.*)$/m', $env, $matches)) {
+            $appUrl = trim($matches[1], "\"' ");
+            if ($appUrl !== '') {
+                return $appUrl;
+            }
+        }
+    }
+
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (($_SERVER['SERVER_PORT'] ?? null) === '443');
+
+    return ($isHttps ? 'https://' : 'http://') . $host;
 }
 
 // Check requirements
@@ -196,11 +327,18 @@ function checkRequirements() {
     $checks['cURL Extension'] = extension_loaded('curl');
     $checks['Fileinfo Extension'] = extension_loaded('fileinfo');
     $checks['GD Extension'] = extension_loaded('gd');
+    $checks['Zip Extension'] = extension_loaded('zip');
+    $checks['Vendor Autoload Present'] = file_exists(__DIR__ . '/school-management/vendor/autoload.php');
 
     $basePath = __DIR__ . '/school-management';
+
+    // Always try to auto-fix first before checking
+    tryFixPermissions();
+
     $checks['storage/ Writable'] = is_writable($basePath . '/storage');
     $checks['bootstrap/cache/ Writable'] = is_writable($basePath . '/bootstrap/cache');
-    $checks['.env Writable'] = is_writable($basePath) || is_writable($basePath . '/.env');
+    // .env check: either the directory is writable (can create .env) or the file itself is writable
+    $checks['.env Writable'] = is_writable($basePath . '/.env') || (!file_exists($basePath . '/.env') && is_writable($basePath));
 
     return $checks;
 }
@@ -251,7 +389,6 @@ if ($step === 1 || $step === 2) {
         <p>Installation Wizard</p>
     </div>
     <div class="installer-body">
-        {{-- Step Indicators --}}
         <div class="step-indicator">
             <?php for ($i = 1; $i <= 5; $i++): ?>
             <div class="step-dot <?= $i < $step ? 'done' : ($i === $step ? 'active' : '') ?>">
@@ -269,9 +406,12 @@ if ($step === 1 || $step === 2) {
         <?php endif; ?>
 
         <?php if ($step === 1): ?>
-        {{-- Step 1: Welcome & Requirements --}}
         <h5 class="fw-bold mb-3">Step 1: System Requirements</h5>
         <p class="text-muted mb-3">Checking if your server meets the requirements...</p>
+
+        <?php if (isset($_GET['fixed'])): ?>
+        <div class="alert alert-info py-2"><i class="bi bi-arrow-repeat me-1"></i> Permission fix attempted. See results below.</div>
+        <?php endif; ?>
 
         <?php foreach ($requirements as $name => $passed): ?>
         <div class="check-item">
@@ -283,15 +423,48 @@ if ($step === 1 || $step === 2) {
         </div>
         <?php endforeach; ?>
 
+        <?php
+        $permFailed = !($requirements['storage/ Writable'] ?? true)
+                   || !($requirements['bootstrap/cache/ Writable'] ?? true)
+                   || !($requirements['.env Writable'] ?? true);
+        ?>
+
+        <?php if ($permFailed): ?>
+        <div class="alert alert-warning mt-4" style="border-radius:10px;">
+            <strong><i class="bi bi-folder-x me-1"></i> Folder Permission Issue</strong>
+            <p class="mb-2 mt-1 small">The installer tried to fix permissions automatically but some folders are still not writable. This is common on Hostinger shared hosting.</p>
+            <strong class="small">Fix it manually in Hostinger File Manager:</strong>
+            <ol class="small mb-2 mt-1" style="padding-left:18px;">
+                <li>In <strong>hPanel</strong> go to <strong>Files → File Manager</strong></li>
+                <li>Navigate to <code>public_html/school-management/</code></li>
+                <li>Right-click the <code>storage</code> folder → <strong>Permissions (chmod)</strong></li>
+                <li>Set to <strong>755</strong> and check <em>"Apply to subdirectories and files"</em> → Save</li>
+                <li>Repeat for the <code>bootstrap/cache</code> folder → set to <strong>755</strong></li>
+                <li>Come back here and click <strong>Try Again</strong></li>
+            </ol>
+            <form method="POST" class="d-inline me-2">
+                <input type="hidden" name="action" value="fix_permissions">
+                <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-magic me-1"></i>Auto-Fix Permissions</button>
+            </form>
+            <a href="installer.php?step=1" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-repeat me-1"></i>Refresh Check</a>
+        </div>
+        <?php endif; ?>
+
+        <?php if (!$allPassed && !$permFailed): ?>
+        <div class="alert alert-danger mt-3">
+            <strong><i class="bi bi-exclamation-triangle me-1"></i> Missing PHP Extensions</strong><br>
+            <span class="small">Contact your hosting provider to enable the missing PHP extensions listed above. Most major hosts (Hostinger, GoDaddy, Bluehost) support all required extensions — you may need to switch to <strong>PHP 8.1+</strong> in your hosting panel.</span>
+        </div>
+        <?php endif; ?>
+
         <form method="POST" class="mt-4">
             <input type="hidden" name="action" value="check_requirements">
             <button type="submit" class="btn btn-install w-100" <?= !$allPassed ? 'disabled' : '' ?>>
-                <?= $allPassed ? 'Continue <i class="bi bi-arrow-right ms-1"></i>' : 'Fix Requirements First' ?>
+                <?= $allPassed ? 'Continue <i class="bi bi-arrow-right ms-1"></i>' : 'Fix Requirements to Continue' ?>
             </button>
         </form>
 
         <?php elseif ($step === 2): ?>
-        {{-- Step 2: Database Configuration --}}
         <h5 class="fw-bold mb-3">Step 2: Database Configuration</h5>
         <p class="text-muted mb-3">Create a MySQL database on your hosting panel first, then enter the details below.</p>
 
@@ -323,7 +496,6 @@ if ($step === 1 || $step === 2) {
         </form>
 
         <?php elseif ($step === 3): ?>
-        {{-- Step 3: Admin Account --}}
         <h5 class="fw-bold mb-3">Step 3: Admin Account & App URL</h5>
         <p class="text-muted mb-3">Set up the administrator account and your website URL.</p>
 
@@ -351,7 +523,6 @@ if ($step === 1 || $step === 2) {
         </form>
 
         <?php elseif ($step === 4): ?>
-        {{-- Step 4: Install --}}
         <h5 class="fw-bold mb-3">Step 4: Install</h5>
         <p class="text-muted mb-3">Everything is ready. Click the button below to install the School Management System.</p>
 
@@ -372,7 +543,6 @@ if ($step === 1 || $step === 2) {
         </form>
 
         <?php elseif ($step === 5): ?>
-        {{-- Step 5: Success --}}
         <div class="success-box">
             <div class="icon"><i class="bi bi-check-circle-fill"></i></div>
             <h4 class="fw-bold mt-3">Installation Complete!</h4>
@@ -385,6 +555,7 @@ if ($step === 1 || $step === 2) {
             <a href="<?= htmlspecialchars($_SESSION['admin']['url'] ?? '/', ENT_QUOTES, 'UTF-8') ?>" class="btn btn-install mt-2">
                 <i class="bi bi-box-arrow-in-right me-1"></i> Go to Login
             </a>
+            <?php unset($_SESSION['db'], $_SESSION['admin']); ?>
         </div>
         <?php endif; ?>
     </div>

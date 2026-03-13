@@ -102,7 +102,9 @@
         <div class="card table-card mt-3">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-semibold">Recent Payments</h6>
-                <a href="{{ route('fees.payments') }}" class="btn btn-sm btn-outline-primary">View All</a>
+                @if(auth()->user()->hasPermission('fees.payments.manage'))
+                    <a href="{{ route('fees.payments') }}" class="btn btn-sm btn-outline-primary">View All</a>
+                @endif
             </div>
             <div class="card-body p-0">
                 @if($recentPayments->count())

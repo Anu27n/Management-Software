@@ -125,6 +125,18 @@
 
             <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-people me-1"></i>Parent / Guardian Details</h6>
             <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label class="form-label">Linked Parent Login Account</label>
+                    <select name="parent_user_id" class="form-select">
+                        <option value="">Not linked</option>
+                        @foreach($parentUsers as $parentUser)
+                            <option value="{{ $parentUser->id }}" {{ old('parent_user_id', $student->parent_user_id) == $parentUser->id ? 'selected' : '' }}>
+                                {{ $parentUser->name }} ({{ $parentUser->email }})
+                            </option>
+                        @endforeach
+                    </select>
+                    <small class="text-muted">Create parent accounts from Settings > User Accounts, then link here.</small>
+                </div>
                 <div class="col-md-4">
                     <label class="form-label">Father's Name <span class="text-danger">*</span></label>
                     <input type="text" name="father_name" class="form-control" value="{{ old('father_name', $student->father_name) }}" required>

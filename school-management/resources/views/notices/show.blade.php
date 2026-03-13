@@ -36,7 +36,9 @@
     </div>
 </div>
 <div class="mt-3 d-flex gap-2">
-    <a href="{{ route('notices.edit', $notice) }}" class="btn btn-warning"><i class="bi bi-pencil me-1"></i>Edit</a>
+    @if(auth()->user()->hasPermission('notices.manage'))
+        <a href="{{ route('notices.edit', $notice) }}" class="btn btn-warning"><i class="bi bi-pencil me-1"></i>Edit</a>
+    @endif
     <a href="{{ route('notices.index') }}" class="btn btn-secondary">Back</a>
 </div>
 @endsection

@@ -6,6 +6,7 @@
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
     <h5 class="mb-0">All Students</h5>
     <div class="d-flex gap-2">
+        <a href="{{ route('students.bulk-upload') }}" class="btn btn-outline-primary"><i class="bi bi-upload me-1"></i>Bulk Upload</a>
         <div class="btn-group btn-group-sm">
             <a href="{{ route('export.students.csv', request()->query()) }}" class="btn btn-outline-success"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
             <a href="{{ route('export.students.pdf', request()->query()) }}" class="btn btn-outline-danger"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>

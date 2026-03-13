@@ -41,12 +41,12 @@
                 <table class="table table-sm table-borderless mb-0">
                     <tr><td class="text-muted" style="width:140px">Name</td><td class="fw-semibold">{{ $student->full_name }}</td></tr>
                     <tr><td class="text-muted">Admission No.</td><td>{{ $student->admission_no }}</td></tr>
-                    <tr><td class="text-muted">Admission No.</td><td>{{ $student->admission_no }}</td></tr>
+                    <tr><td class="text-muted">Status</td><td>{{ ucfirst($student->status) }}</td></tr>
                 </table>
             </div>
             <div class="col-md-6">
                 <table class="table table-sm table-borderless mb-0">
-                    <tr><td class="text-muted" style="width:140px">Class</td><td>{{ $student->class->name ?? '-' }} — {{ $student->section->name ?? '-' }}</td></tr>
+                    <tr><td class="text-muted" style="width:140px">Class</td><td>{{ $student->schoolClass->name ?? '-' }} — {{ $student->section->name ?? '-' }}</td></tr>
                     <tr><td class="text-muted">Academic Year</td><td>{{ $student->academicYear->name ?? '-' }}</td></tr>
                     <tr><td class="text-muted">Date</td><td>{{ now()->format('M d, Y') }}</td></tr>
                 </table>
@@ -61,12 +61,12 @@
                 <tbody>
                     @php $totalObtained = 0; $totalMax = 0; @endphp
                     @forelse($results as $i => $result)
-                    @php $totalObtained += $result->marks_obtained; $totalMax += $result->max_marks; @endphp
+                    @php $totalObtained += $result->marks_obtained; $totalMax += $result->total_marks; @endphp
                     <tr>
                         <td>{{ $i + 1 }}</td>
                         <td>{{ $result->subject->name ?? 'N/A' }}</td>
                         <td class="text-center">{{ $result->marks_obtained }}</td>
-                        <td class="text-center">{{ $result->max_marks }}</td>
+                        <td class="text-center">{{ $result->total_marks }}</td>
                         <td class="text-center">{{ number_format($result->percentage, 1) }}%</td>
                         <td class="text-center"><span class="badge bg-{{ $result->grade == 'A+' || $result->grade == 'A' ? 'success' : ($result->grade == 'F' ? 'danger' : 'primary') }}">{{ $result->grade }}</span></td>
                     </tr>
@@ -95,7 +95,9 @@
         </div>
     </div>
     <div class="card-footer bg-white text-end d-print-none">
-        <a href="{{ route('export.reportcard.pdf', ['exam_id' => request('exam_id'), 'student_id' => request('student_id')]) }}" class="btn btn-outline-danger me-1"><i class="bi bi-filetype-pdf me-1"></i>Download PDF</a>
+        @if(auth()->user()->hasPermission('exports.manage'))
+            <a href="{{ route('export.reportcard.pdf', ['exam_id' => request('exam_id'), 'student_id' => request('student_id')]) }}" class="btn btn-outline-danger me-1"><i class="bi bi-filetype-pdf me-1"></i>Download PDF</a>
+        @endif
         <button onclick="window.print()" class="btn btn-outline-secondary"><i class="bi bi-printer me-1"></i>Print</button>
     </div>
 </div>

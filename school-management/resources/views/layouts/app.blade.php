@@ -272,6 +272,29 @@
     {{-- Sidebar Overlay --}}
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
+    @php
+        $authUser = auth()->user();
+        $canManageStudents = $authUser->hasPermission('students.manage');
+        $canManageAttendance = $authUser->hasPermission('attendance.manage');
+        $canViewHomework = $authUser->hasPermission('homework.view');
+        $canManageHomework = $authUser->hasPermission('homework.manage');
+        $canManageReportCards = $authUser->hasPermission('reportcards.manage');
+        $canViewReportCards = $authUser->hasPermission('reportcards.view');
+        $canViewNotices = $authUser->hasPermission('notices.view');
+        $canManageNotices = $authUser->hasPermission('notices.manage');
+        $canApplyLeaves = $authUser->hasPermission('leaves.apply');
+        $canManageFeeStructures = $authUser->hasPermission('fees.manage');
+        $canManageFeePayments = $authUser->hasPermission('fees.payments.manage');
+        $canManageSettings = $authUser->hasPermission('settings.manage');
+        $canManageUsers = $authUser->hasPermission('users.manage');
+        $canManageNotifications = $authUser->hasPermission('notifications.manage');
+        $canManageRoles = $authUser->hasPermission('roles.manage');
+
+        $canManageAcademic = $canManageStudents || $canManageAttendance || $canManageReportCards;
+        $canManageFees = $canManageFeeStructures || $canManageFeePayments;
+        $showSettingsSection = $canManageSettings || $canManageUsers || $canManageNotifications || $canManageRoles;
+    @endphp
+
     {{-- Desktop Sidebar --}}
     <nav class="sidebar" id="sidebar">
         <div class="brand">
@@ -285,32 +308,55 @@
         </a>
 
         <div class="nav-section">Academic</div>
-        <a href="{{ route('students.index') }}" class="nav-link {{ request()->routeIs('students.*') ? 'active' : '' }}">
-            <i class="bi bi-people-fill"></i> Students
-        </a>
-        <a href="{{ route('attendance.index') }}" class="nav-link {{ request()->routeIs('attendance.*') ? 'active' : '' }}">
-            <i class="bi bi-calendar-check-fill"></i> Attendance
-        </a>
+        @if($canManageStudents)
+            <a href="{{ route('students.index') }}" class="nav-link {{ request()->routeIs('students.*') ? 'active' : '' }}">
+                <i class="bi bi-people-fill"></i> Students
+            </a>
+        @endif
+        @if($canManageAttendance)
+            <a href="{{ route('attendance.index') }}" class="nav-link {{ request()->routeIs('attendance.*') ? 'active' : '' }}">
+                <i class="bi bi-calendar-check-fill"></i> Attendance
+            </a>
+        @endif
+        @if($canViewHomework)
         <a href="{{ route('homework.index') }}" class="nav-link {{ request()->routeIs('homework.*') ? 'active' : '' }}">
             <i class="bi bi-journal-text"></i> Homework
         </a>
-        <a href="{{ route('reportcards.exams') }}" class="nav-link {{ request()->routeIs('reportcards.*') ? 'active' : '' }}">
+        @endif
+        @if($canViewReportCards)
+        <a href="{{ $canManageReportCards ? route('reportcards.exams') : route('reportcards.view') }}" class="nav-link {{ request()->routeIs('reportcards.*') ? 'active' : '' }}">
             <i class="bi bi-file-earmark-bar-graph-fill"></i> Report Cards
         </a>
+        @endif
 
         <div class="nav-section">Management</div>
-        <a href="{{ route('fees.categories') }}" class="nav-link {{ request()->routeIs('fees.*') ? 'active' : '' }}">
-            <i class="bi bi-cash-stack"></i> Fee Management
-        </a>
+        @if($canManageFeeStructures)
+            <a href="{{ route('fees.categories') }}" class="nav-link {{ request()->routeIs('fees.*') ? 'active' : '' }}">
+                <i class="bi bi-cash-stack"></i> Fee Setup
+            </a>
+            <a href="{{ route('settings.payment-gateway') }}" class="nav-link {{ request()->routeIs('settings.payment-gateway') ? 'active' : '' }}">
+                <i class="bi bi-credit-card-2-front"></i> Payment Gateway
+            </a>
+        @endif
+        @if($canManageFeePayments)
+            <a href="{{ route('fees.payments') }}" class="nav-link {{ request()->routeIs('fees.payments*') ? 'active' : '' }}">
+                <i class="bi bi-receipt-cutoff"></i> Fee Payments
+            </a>
+        @endif
+        @if($canViewNotices)
         <a href="{{ route('notices.index') }}" class="nav-link {{ request()->routeIs('notices.*') ? 'active' : '' }}">
             <i class="bi bi-megaphone-fill"></i> Notices
         </a>
+        @endif
+        @if($canApplyLeaves)
         <a href="{{ route('leaves.index') }}" class="nav-link {{ request()->routeIs('leaves.*') ? 'active' : '' }}">
             <i class="bi bi-envelope-paper-fill"></i> Leave Applications
         </a>
+        @endif
 
-        @if(auth()->user()->isAdmin())
+        @if($showSettingsSection)
         <div class="nav-section">Settings</div>
+        @if($canManageSettings)
         <a href="{{ route('settings.classes') }}" class="nav-link {{ request()->routeIs('settings.classes') ? 'active' : '' }}">
             <i class="bi bi-building"></i> Classes
         </a>
@@ -323,6 +369,22 @@
         <a href="{{ route('settings.academic-years') }}" class="nav-link {{ request()->routeIs('settings.academic-years') ? 'active' : '' }}">
             <i class="bi bi-calendar3"></i> Academic Years
         </a>
+        @endif
+        @if($canManageUsers)
+        <a href="{{ route('settings.users') }}" class="nav-link {{ request()->routeIs('settings.users*') ? 'active' : '' }}">
+            <i class="bi bi-people"></i> User Accounts
+        </a>
+        @endif
+        @if($canManageRoles)
+        <a href="{{ route('settings.roles-permissions') }}" class="nav-link {{ request()->routeIs('settings.roles-permissions*') ? 'active' : '' }}">
+            <i class="bi bi-shield-check"></i> Roles & Permissions
+        </a>
+        @endif
+        @if($canManageNotifications)
+        <a href="{{ route('settings.notifications') }}" class="nav-link {{ request()->routeIs('settings.notifications') ? 'active' : '' }}">
+            <i class="bi bi-bell"></i> Notifications
+        </a>
+        @endif
         @endif
     </nav>
 
@@ -391,18 +453,63 @@
                 <i class="bi {{ request()->routeIs('dashboard') ? 'bi-grid-1x2-fill' : 'bi-grid-1x2' }}"></i>
                 <span>Home</span>
             </a>
-            <a href="{{ route('students.index') }}" class="bottom-nav-item {{ request()->routeIs('students.*') ? 'active' : '' }}">
-                <i class="bi {{ request()->routeIs('students.*') ? 'bi-people-fill' : 'bi-people' }}"></i>
-                <span>Students</span>
-            </a>
-            <a href="{{ route('fees.categories') }}" class="bottom-nav-item {{ request()->routeIs('fees.*') ? 'active' : '' }}">
-                <i class="bi {{ request()->routeIs('fees.*') ? 'bi-cash-stack' : 'bi-cash' }}"></i>
-                <span>Fees</span>
-            </a>
-            <a href="{{ route('attendance.index') }}" class="bottom-nav-item {{ request()->routeIs('attendance.*') ? 'active' : '' }}">
-                <i class="bi {{ request()->routeIs('attendance.*') ? 'bi-calendar-check-fill' : 'bi-calendar-check' }}"></i>
-                <span>Attend.</span>
-            </a>
+
+            @if($canManageStudents)
+                <a href="{{ route('students.index') }}" class="bottom-nav-item {{ request()->routeIs('students.*') ? 'active' : '' }}">
+                    <i class="bi {{ request()->routeIs('students.*') ? 'bi-people-fill' : 'bi-people' }}"></i>
+                    <span>Students</span>
+                </a>
+            @elseif($canViewHomework)
+                <a href="{{ route('homework.index') }}" class="bottom-nav-item {{ request()->routeIs('homework.*') ? 'active' : '' }}">
+                    <i class="bi {{ request()->routeIs('homework.*') ? 'bi-journal-text' : 'bi-journal' }}"></i>
+                    <span>Homework</span>
+                </a>
+            @elseif($canViewNotices)
+                <a href="{{ route('notices.index') }}" class="bottom-nav-item {{ request()->routeIs('notices.*') ? 'active' : '' }}">
+                    <i class="bi {{ request()->routeIs('notices.*') ? 'bi-megaphone-fill' : 'bi-megaphone' }}"></i>
+                    <span>Notices</span>
+                </a>
+            @endif
+
+            @if($canManageFeePayments)
+                <a href="{{ route('fees.payments') }}" class="bottom-nav-item {{ request()->routeIs('fees.payments*') ? 'active' : '' }}">
+                    <i class="bi {{ request()->routeIs('fees.payments*') ? 'bi-receipt-cutoff' : 'bi-receipt' }}"></i>
+                    <span>Payments</span>
+                </a>
+            @elseif($canManageFeeStructures)
+                <a href="{{ route('fees.categories') }}" class="bottom-nav-item {{ request()->routeIs('fees.categories','fees.structures') ? 'active' : '' }}">
+                    <i class="bi {{ request()->routeIs('fees.categories','fees.structures') ? 'bi-cash-stack' : 'bi-cash' }}"></i>
+                    <span>Fees</span>
+                </a>
+            @elseif($canManageAttendance)
+                <a href="{{ route('attendance.index') }}" class="bottom-nav-item {{ request()->routeIs('attendance.*') ? 'active' : '' }}">
+                    <i class="bi {{ request()->routeIs('attendance.*') ? 'bi-calendar-check-fill' : 'bi-calendar-check' }}"></i>
+                    <span>Attend.</span>
+                </a>
+            @elseif($canViewReportCards)
+                <a href="{{ $canManageReportCards ? route('reportcards.exams') : route('reportcards.view') }}" class="bottom-nav-item {{ request()->routeIs('reportcards.*') ? 'active' : '' }}">
+                    <i class="bi {{ request()->routeIs('reportcards.*') ? 'bi-file-earmark-bar-graph-fill' : 'bi-file-earmark-bar-graph' }}"></i>
+                    <span>Reports</span>
+                </a>
+            @endif
+
+            @if($canManageAttendance)
+                <a href="{{ route('attendance.index') }}" class="bottom-nav-item {{ request()->routeIs('attendance.*') ? 'active' : '' }}">
+                    <i class="bi {{ request()->routeIs('attendance.*') ? 'bi-calendar-check-fill' : 'bi-calendar-check' }}"></i>
+                    <span>Attend.</span>
+                </a>
+            @elseif($canViewReportCards)
+                <a href="{{ $canManageReportCards ? route('reportcards.exams') : route('reportcards.view') }}" class="bottom-nav-item {{ request()->routeIs('reportcards.*') ? 'active' : '' }}">
+                    <i class="bi {{ request()->routeIs('reportcards.*') ? 'bi-file-earmark-bar-graph-fill' : 'bi-file-earmark-bar-graph' }}"></i>
+                    <span>Reports</span>
+                </a>
+            @elseif($canViewNotices)
+                <a href="{{ route('notices.index') }}" class="bottom-nav-item {{ request()->routeIs('notices.*') ? 'active' : '' }}">
+                    <i class="bi {{ request()->routeIs('notices.*') ? 'bi-megaphone-fill' : 'bi-megaphone' }}"></i>
+                    <span>Notices</span>
+                </a>
+            @endif
+
             <a href="javascript:void(0)" class="bottom-nav-item {{ request()->routeIs('homework.*','notices.*','reportcards.*','leaves.*','settings.*') ? 'active' : '' }}" onclick="toggleMoreMenu()">
                 <i class="bi bi-three-dots-vertical"></i>
                 <span>More</span>
@@ -416,25 +523,57 @@
     {{-- More Menu --}}
     <div class="more-menu" id="moreMenu">
         <div class="more-menu-section">Academic</div>
+        @if($canManageStudents)
+        <a href="{{ route('students.index') }}" class="more-menu-item {{ request()->routeIs('students.*') ? 'active' : '' }}">
+            <i class="bi bi-people-fill"></i> Students
+        </a>
+        @endif
+        @if($canManageAttendance)
+        <a href="{{ route('attendance.index') }}" class="more-menu-item {{ request()->routeIs('attendance.*') ? 'active' : '' }}">
+            <i class="bi bi-calendar-check-fill"></i> Attendance
+        </a>
+        @endif
+        @if($canViewHomework)
         <a href="{{ route('homework.index') }}" class="more-menu-item {{ request()->routeIs('homework.*') ? 'active' : '' }}">
             <i class="bi bi-journal-text"></i> Homework
         </a>
-        <a href="{{ route('reportcards.exams') }}" class="more-menu-item {{ request()->routeIs('reportcards.*') ? 'active' : '' }}">
+        @endif
+        @if($canViewReportCards)
+        <a href="{{ $canManageReportCards ? route('reportcards.exams') : route('reportcards.view') }}" class="more-menu-item {{ request()->routeIs('reportcards.*') ? 'active' : '' }}">
             <i class="bi bi-file-earmark-bar-graph-fill"></i> Report Cards
         </a>
+        @endif
 
         <div class="more-menu-divider"></div>
         <div class="more-menu-section">Management</div>
+        @if($canManageFeeStructures)
+        <a href="{{ route('fees.categories') }}" class="more-menu-item {{ request()->routeIs('fees.categories','fees.structures') ? 'active' : '' }}">
+            <i class="bi bi-cash-stack"></i> Fee Setup
+        </a>
+        <a href="{{ route('settings.payment-gateway') }}" class="more-menu-item {{ request()->routeIs('settings.payment-gateway') ? 'active' : '' }}">
+            <i class="bi bi-credit-card-2-front"></i> Payment Gateway
+        </a>
+        @endif
+        @if($canManageFeePayments)
+        <a href="{{ route('fees.payments') }}" class="more-menu-item {{ request()->routeIs('fees.payments*') ? 'active' : '' }}">
+            <i class="bi bi-receipt-cutoff"></i> Fee Payments
+        </a>
+        @endif
+        @if($canViewNotices)
         <a href="{{ route('notices.index') }}" class="more-menu-item {{ request()->routeIs('notices.*') ? 'active' : '' }}">
             <i class="bi bi-megaphone-fill"></i> Notices
         </a>
+        @endif
+        @if($canApplyLeaves)
         <a href="{{ route('leaves.index') }}" class="more-menu-item {{ request()->routeIs('leaves.*') ? 'active' : '' }}">
             <i class="bi bi-envelope-paper-fill"></i> Leave Applications
         </a>
+        @endif
 
-        @if(auth()->user()->isAdmin())
+        @if($showSettingsSection)
         <div class="more-menu-divider"></div>
         <div class="more-menu-section">Settings</div>
+        @if($canManageSettings)
         <a href="{{ route('settings.classes') }}" class="more-menu-item {{ request()->routeIs('settings.classes') ? 'active' : '' }}">
             <i class="bi bi-building"></i> Classes
         </a>
@@ -448,6 +587,22 @@
             <i class="bi bi-calendar3"></i> Academic Years
         </a>
         @endif
+        @if($canManageUsers)
+        <a href="{{ route('settings.users') }}" class="more-menu-item {{ request()->routeIs('settings.users*') ? 'active' : '' }}">
+            <i class="bi bi-people"></i> User Accounts
+        </a>
+        @endif
+        @if($canManageRoles)
+        <a href="{{ route('settings.roles-permissions') }}" class="more-menu-item {{ request()->routeIs('settings.roles-permissions*') ? 'active' : '' }}">
+            <i class="bi bi-shield-check"></i> Roles & Permissions
+        </a>
+        @endif
+        @if($canManageNotifications)
+        <a href="{{ route('settings.notifications') }}" class="more-menu-item {{ request()->routeIs('settings.notifications') ? 'active' : '' }}">
+            <i class="bi bi-bell"></i> Notifications
+        </a>
+        @endif
+        @endif
 
         <div class="more-menu-divider"></div>
         <a href="javascript:void(0)" class="more-menu-item text-danger" onclick="document.getElementById('logoutFormMobile').submit()">
@@ -457,16 +612,16 @@
     </div>
 
     {{-- FAB (context-sensitive) --}}
-    @if(request()->routeIs('students.index'))
+    @if($canManageStudents && request()->routeIs('students.index'))
         <a href="{{ route('students.create') }}" class="mobile-fab"><i class="bi bi-plus-lg"></i></a>
-    @elseif(request()->routeIs('homework.index'))
+    @elseif($canManageHomework && request()->routeIs('homework.index'))
         <a href="{{ route('homework.create') }}" class="mobile-fab"><i class="bi bi-plus-lg"></i></a>
-    @elseif(request()->routeIs('notices.index'))
+    @elseif($canManageNotices && request()->routeIs('notices.index'))
         <a href="{{ route('notices.create') }}" class="mobile-fab"><i class="bi bi-plus-lg"></i></a>
-    @elseif(request()->routeIs('leaves.index'))
+    @elseif($canApplyLeaves && request()->routeIs('leaves.index'))
         <a href="{{ route('leaves.create') }}" class="mobile-fab"><i class="bi bi-plus-lg"></i></a>
-    @elseif(request()->routeIs('fees.payments'))
-        <a href="{{ route('fees.create-payment') }}" class="mobile-fab"><i class="bi bi-plus-lg"></i></a>
+    @elseif($canManageFeePayments && request()->routeIs('fees.payments'))
+        <a href="{{ route('fees.payments.create') }}" class="mobile-fab"><i class="bi bi-plus-lg"></i></a>
     @endif
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

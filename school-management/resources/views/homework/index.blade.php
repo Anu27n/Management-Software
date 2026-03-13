@@ -5,7 +5,9 @@
 @section('content')
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
     <h5 class="mb-0">All Homework</h5>
-    <a href="{{ route('homework.create') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Assign Homework</a>
+    @if(auth()->user()->hasPermission('homework.manage'))
+        <a href="{{ route('homework.create') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Assign Homework</a>
+    @endif
 </div>
 
 <div class="card table-card">
@@ -25,13 +27,15 @@
                     </td>
                     <td>{{ $hw->assignedBy->name }}</td>
                     <td>
-                        <div class="btn-group btn-group-sm">
-                            <a href="{{ route('homework.edit', $hw) }}" class="btn btn-outline-warning"><i class="bi bi-pencil"></i></a>
-                            <form action="{{ route('homework.destroy', $hw) }}" method="POST" onsubmit="return confirm('Delete?')">
-                                @csrf @method('DELETE')
-                                <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
-                            </form>
-                        </div>
+                        @if(auth()->user()->hasPermission('homework.manage'))
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ route('homework.edit', $hw) }}" class="btn btn-outline-warning"><i class="bi bi-pencil"></i></a>
+                                <form action="{{ route('homework.destroy', $hw) }}" method="POST" onsubmit="return confirm('Delete?')">
+                                    @csrf @method('DELETE')
+                                    <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </div>
+                        @endif
                     </td>
                 </tr>
                 @empty

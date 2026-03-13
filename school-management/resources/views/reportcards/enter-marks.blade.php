@@ -37,7 +37,7 @@
             </div>
             <div class="col-md-3">
                 <label class="form-label">Subject <span class="text-danger">*</span></label>
-                <select name="subject_id" class="form-select" required>
+                <select name="subject_id" id="subjectSelect" class="form-select" required>
                     <option value="">Select</option>
                     @if(isset($subjects))
                         @foreach($subjects as $subject)
@@ -98,19 +98,59 @@
 @endif
 @endsection
 
-@section('scripts')
+@push('scripts')
 <script>
-document.getElementById('classSelect')?.addEventListener('change', function() {
+(function () {
+    const classSelect = document.getElementById('classSelect');
     const sectionSelect = document.getElementById('sectionSelect');
-    sectionSelect.innerHTML = '<option value="">Loading...</option>';
-    if (!this.value) { sectionSelect.innerHTML = '<option value="">Select</option>'; return; }
-    fetch('/api/classes/' + this.value + '/sections')
-        .then(r => r.json())
-        .then(data => {
-            let html = '<option value="">Select</option>';
-            data.forEach(s => html += `<option value="${s.id}">${s.name}</option>`);
-            sectionSelect.innerHTML = html;
+    const subjectSelect = document.getElementById('subjectSelect');
+    const lookupBaseUrl = @json(url('/api/reportcards/classes'));
+
+    if (!classSelect || !sectionSelect || !subjectSelect) {
+        return;
+    }
+
+    const selectedSection = @json((string) request('section_id'));
+    const selectedSubject = @json((string) request('subject_id'));
+
+    const renderOptions = (selectEl, items, selectedValue = '') => {
+        let html = '<option value="">Select</option>';
+        items.forEach((item) => {
+            const selected = String(item.id) === String(selectedValue) ? 'selected' : '';
+            html += `<option value="${item.id}" ${selected}>${item.name}</option>`;
         });
-});
+        selectEl.innerHTML = html;
+    };
+
+    const loadClassLookups = (classId, preserveSelected = false) => {
+        if (!classId) {
+            sectionSelect.innerHTML = '<option value="">Select</option>';
+            subjectSelect.innerHTML = '<option value="">Select</option>';
+            return;
+        }
+
+        sectionSelect.innerHTML = '<option value="">Loading...</option>';
+        subjectSelect.innerHTML = '<option value="">Loading...</option>';
+
+        fetch(`${lookupBaseUrl}/${classId}/lookups`)
+            .then((response) => response.json())
+            .then((data) => {
+                renderOptions(sectionSelect, data.sections || [], preserveSelected ? selectedSection : '');
+                renderOptions(subjectSelect, data.subjects || [], preserveSelected ? selectedSubject : '');
+            })
+            .catch(() => {
+                sectionSelect.innerHTML = '<option value="">Select</option>';
+                subjectSelect.innerHTML = '<option value="">Select</option>';
+            });
+    };
+
+    classSelect.addEventListener('change', function () {
+        loadClassLookups(this.value, false);
+    });
+
+    if (classSelect.value) {
+        loadClassLookups(classSelect.value, true);
+    }
+})();
 </script>
-@endsection
+@endpush
