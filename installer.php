@@ -1,17 +1,43 @@
 <?php
 /**
  * School Management System - Web Installer
- * Upload this file along with the school-management folder to your hosting.
- * Access it via browser: https://yourdomain.com/installer.php
+ * Place this file inside Laravel's public/ folder.
+ * The installer will auto-detect Laravel root as ../
  */
 
 session_start();
 
+// Detect Laravel root automatically when installer is inside /public
+$basePath = realpath(__DIR__ . '/../');
+
+if ($basePath === false || !is_dir($basePath)) {
+    http_response_code(500);
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Installer Error</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-light">
+        <div class="container py-5">
+            <div class="alert alert-danger">
+                <strong>Installer Error:</strong> Could not detect Laravel root directory from ../
+            </div>
+        </div>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
 // Prevent access after installation is complete
-$lockFile = __DIR__ . '/school-management/.installed';
+$lockFile = $basePath . '/.installed';
 
 if (file_exists($lockFile)) {
-    $installedUrl = discoverInstalledAppUrl();
+    $installedUrl = discoverInstalledAppUrl($basePath);
     ?>
     <!DOCTYPE html>
     <html lang="en">
@@ -35,7 +61,7 @@ if (file_exists($lockFile)) {
             </div>
             <div class="card-body p-4">
                 <div class="alert alert-success mb-3">
-                    Installation lock file exists: <code>school-management/.installed</code>
+                    Installation lock file exists: <code>.installed</code>
                 </div>
                 <p class="mb-3">For security, reinstall is disabled by default. If you need a fresh install, delete the lock file and run again.</p>
                 <div class="d-flex gap-2">
@@ -58,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
     if ($action === 'fix_permissions') {
-        tryFixPermissions();
+        tryFixPermissions($basePath);
         // Reload page so fresh check runs
         header('Location: installer.php?step=1&fixed=1');
         exit;
@@ -130,10 +156,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Session expired. Please start over.';
             $step = 1;
         } else {
-            $basePath = __DIR__ . '/school-management';
+            ensureRuntimeDirectories($basePath);
 
             // Step 1: Write .env file
-            $appKey = 'base64:' . base64_encode(random_bytes(32));
+            try {
+                $appKey = 'base64:' . base64_encode(random_bytes(32));
+            } catch (Throwable $e) {
+                $errors[] = 'Could not generate APP_KEY: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');
+                $appKey = '';
+            }
+
             $envContent = "APP_NAME=\"School Management System\"\n";
             $envContent .= "APP_ENV=production\n";
             $envContent .= "APP_KEY={$appKey}\n";
@@ -158,8 +190,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (empty($errors)) {
                 // Step 2: Run artisan commands
                 // Clear caches
-                runArtisanCommand($basePath, 'config:clear', $out1);
-                runArtisanCommand($basePath, 'cache:clear', $out2);
+                $configClearRet = runArtisanCommand($basePath, 'config:clear', $out1);
+                if ($configClearRet !== 0) {
+                    $errors[] = 'config:clear failed: ' . htmlspecialchars(implode("\n", $out1), ENT_QUOTES, 'UTF-8');
+                }
+
+                $cacheClearRet = runArtisanCommand($basePath, 'cache:clear', $out2);
+                if ($cacheClearRet !== 0) {
+                    $errors[] = 'cache:clear failed: ' . htmlspecialchars(implode("\n", $out2), ENT_QUOTES, 'UTF-8');
+                }
 
                 // Run migrations
                 $migRet = runArtisanCommand($basePath, 'migrate --force', $migrationOutput);
@@ -179,14 +218,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $hashedPass = password_hash($admin['pass'], PASSWORD_BCRYPT, ['cost' => 12]);
                     $now = date('Y-m-d H:i:s');
 
-                    $stmt = $pdo->prepare("INSERT INTO users (name, email, password, role, is_active, created_at, updated_at) VALUES (?, ?, ?, 'admin', 1, ?, ?)");
-                    $stmt->execute([$admin['name'], $admin['email'], $hashedPass, $now, $now]);
+                    $checkAdminStmt = $pdo->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
+                    $checkAdminStmt->execute([$admin['email']]);
+                    $existingAdminId = $checkAdminStmt->fetchColumn();
+
+                    if (!$existingAdminId) {
+                        $stmt = $pdo->prepare("INSERT INTO users (name, email, password, role, is_active, created_at, updated_at) VALUES (?, ?, ?, 'admin', 1, ?, ?)");
+                        $stmt->execute([$admin['name'], $admin['email'], $hashedPass, $now, $now]);
+                    }
 
                     // Create default academic year
                     $year = date('Y');
                     $nextYear = $year + 1;
-                    $stmt2 = $pdo->prepare("INSERT INTO academic_years (name, start_date, end_date, is_active, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)");
-                    $stmt2->execute(["{$year}-{$nextYear}", "{$year}-04-01", "{$nextYear}-03-31", $now, $now]);
+
+                    $checkYearStmt = $pdo->prepare("SELECT id FROM academic_years WHERE is_active = 1 LIMIT 1");
+                    $checkYearStmt->execute();
+                    $activeYearId = $checkYearStmt->fetchColumn();
+
+                    if (!$activeYearId) {
+                        $stmt2 = $pdo->prepare("INSERT INTO academic_years (name, start_date, end_date, is_active, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)");
+                        $stmt2->execute(["{$year}-{$nextYear}", "{$year}-04-01", "{$nextYear}-03-31", $now, $now]);
+                    }
 
                     $pdo = null;
                 } catch (PDOException $e) {
@@ -213,9 +265,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 // Optimize for production
-                runArtisanCommand($basePath, 'config:cache');
-                runArtisanCommand($basePath, 'route:cache');
-                runArtisanCommand($basePath, 'view:cache');
+                runArtisanCommand($basePath, 'config:cache', $configCacheOutput);
+                runArtisanCommand($basePath, 'route:cache', $routeCacheOutput);
+                runArtisanCommand($basePath, 'view:cache', $viewCacheOutput);
 
                 // Write lock file
                 file_put_contents($lockFile, date('Y-m-d H:i:s') . ' - Installed');
@@ -233,8 +285,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Auto-fix folder permissions (safe to run at any time)
-function tryFixPermissions() {
-    $basePath = __DIR__ . '/school-management';
+function tryFixPermissions(string $basePath): bool {
+
+    ensureRuntimeDirectories($basePath);
 
     // Directories that need to be writable
     $dirs = [
@@ -251,9 +304,9 @@ function tryFixPermissions() {
 
     foreach ($dirs as $dir) {
         if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true);
+            @mkdir($dir, 0775, true);
         }
-        @chmod($dir, 0755);
+        @chmod($dir, 0775);
     }
 
     // .env: touch it if it doesn't exist so it becomes writable
@@ -268,19 +321,54 @@ function tryFixPermissions() {
     return true;
 }
 
+function ensureRuntimeDirectories(string $basePath): void
+{
+    $requiredDirs = [
+        $basePath . '/bootstrap/cache',
+        $basePath . '/storage/framework/cache',
+        $basePath . '/storage/framework/sessions',
+        $basePath . '/storage/framework/views',
+        $basePath . '/storage/logs',
+    ];
+
+    foreach ($requiredDirs as $dir) {
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+        @chmod($dir, 0775);
+    }
+
+    // Core writable directories for Laravel on shared hosting
+    @chmod($basePath . '/storage', 0775);
+    @chmod($basePath . '/bootstrap/cache', 0775);
+}
+
 function runArtisanCommand(string $basePath, string $command, array &$output = []): int
 {
     $output = [];
 
     try {
-        static $kernel = null;
+        ensureRuntimeDirectories($basePath);
 
-        if ($kernel === null) {
-            require_once $basePath . '/vendor/autoload.php';
-            $app = require $basePath . '/bootstrap/app.php';
-            $kernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
+        if (!file_exists($basePath . '/vendor/autoload.php')) {
+            $output[] = 'vendor/autoload.php not found at: ' . $basePath . '/vendor/autoload.php';
+            return 1;
         }
 
+        if (!file_exists($basePath . '/bootstrap/app.php')) {
+            $output[] = 'bootstrap/app.php not found at: ' . $basePath . '/bootstrap/app.php';
+            return 1;
+        }
+
+        static $kernels = [];
+
+        if (!isset($kernels[$basePath])) {
+            require_once $basePath . '/vendor/autoload.php';
+            $app = require $basePath . '/bootstrap/app.php';
+            $kernels[$basePath] = $app->make(\Illuminate\Contracts\Console\Kernel::class);
+        }
+
+        $kernel = $kernels[$basePath];
         $status = (int) $kernel->call($command);
         $commandOutput = trim((string) $kernel->output());
         if ($commandOutput !== '') {
@@ -289,14 +377,14 @@ function runArtisanCommand(string $basePath, string $command, array &$output = [
 
         return $status;
     } catch (\Throwable $e) {
-        $output[] = $e->getMessage();
+        $output[] = 'Artisan command failed (' . $command . '): ' . $e->getMessage();
         return 1;
     }
 }
 
-function discoverInstalledAppUrl(): string
+function discoverInstalledAppUrl(string $basePath): string
 {
-    $envPath = __DIR__ . '/school-management/.env';
+    $envPath = $basePath . '/.env';
     if (is_file($envPath)) {
         $env = file_get_contents($envPath);
         if (is_string($env) && preg_match('/^APP_URL=(.*)$/m', $env, $matches)) {
@@ -315,7 +403,7 @@ function discoverInstalledAppUrl(): string
 }
 
 // Check requirements
-function checkRequirements() {
+function checkRequirements(string $basePath): array {
     $checks = [];
     $checks['PHP Version >= 8.1'] = version_compare(PHP_VERSION, '8.1.0', '>=');
     $checks['PDO Extension'] = extension_loaded('pdo');
@@ -328,12 +416,10 @@ function checkRequirements() {
     $checks['Fileinfo Extension'] = extension_loaded('fileinfo');
     $checks['GD Extension'] = extension_loaded('gd');
     $checks['Zip Extension'] = extension_loaded('zip');
-    $checks['Vendor Autoload Present'] = file_exists(__DIR__ . '/school-management/vendor/autoload.php');
-
-    $basePath = __DIR__ . '/school-management';
+    $checks['Vendor Autoload Present'] = file_exists($basePath . '/vendor/autoload.php');
 
     // Always try to auto-fix first before checking
-    tryFixPermissions();
+    tryFixPermissions($basePath);
 
     $checks['storage/ Writable'] = is_writable($basePath . '/storage');
     $checks['bootstrap/cache/ Writable'] = is_writable($basePath . '/bootstrap/cache');
@@ -345,7 +431,7 @@ function checkRequirements() {
 
 $allPassed = true;
 if ($step === 1 || $step === 2) {
-    $requirements = checkRequirements();
+    $requirements = checkRequirements($basePath);
     foreach ($requirements as $passed) {
         if (!$passed) { $allPassed = false; break; }
     }
@@ -436,7 +522,7 @@ if ($step === 1 || $step === 2) {
             <strong class="small">Fix it manually in Hostinger File Manager:</strong>
             <ol class="small mb-2 mt-1" style="padding-left:18px;">
                 <li>In <strong>hPanel</strong> go to <strong>Files → File Manager</strong></li>
-                <li>Navigate to <code>public_html/school-management/</code></li>
+                <li>Navigate to your Laravel project root (one level above <code>public/</code>)</li>
                 <li>Right-click the <code>storage</code> folder → <strong>Permissions (chmod)</strong></li>
                 <li>Set to <strong>755</strong> and check <em>"Apply to subdirectories and files"</em> → Save</li>
                 <li>Repeat for the <code>bootstrap/cache</code> folder → set to <strong>755</strong></li>
@@ -552,10 +638,10 @@ if ($step === 1 || $step === 2) {
                 <strong><i class="bi bi-shield-exclamation me-1"></i> Security:</strong> Delete <code>installer.php</code> from your server immediately!
             </div>
 
-            <a href="<?= htmlspecialchars($_SESSION['admin']['url'] ?? '/', ENT_QUOTES, 'UTF-8') ?>" class="btn btn-install mt-2">
+            <a href="<?= htmlspecialchars($_SESSION['installed_url'] ?? $_SESSION['admin']['url'] ?? discoverInstalledAppUrl($basePath), ENT_QUOTES, 'UTF-8') ?>" class="btn btn-install mt-2">
                 <i class="bi bi-box-arrow-in-right me-1"></i> Go to Login
             </a>
-            <?php unset($_SESSION['db'], $_SESSION['admin']); ?>
+            <?php unset($_SESSION['db'], $_SESSION['admin'], $_SESSION['installed_url']); ?>
         </div>
         <?php endif; ?>
     </div>
