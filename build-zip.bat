@@ -7,6 +7,7 @@ set PHP=%LARAGON%\bin\php\php-8.3.30-Win32-vs16-x64\php.exe
 set COMPOSER=%LARAGON%\bin\composer\composer.phar
 set PROJECT=%~dp0
 set SCHOOL=%PROJECT%school-management
+set STAGE=%PROJECT%tmp_build_schoolms
 
 if not exist "%PHP%" (
     echo PHP not found at %PHP%
@@ -41,8 +42,18 @@ echo [2/3] Copying installer.php to public...
 copy /Y "%PROJECT%installer.php" "%SCHOOL%\public\installer.php" >nul
 
 echo.
-echo [3/3] Creating SchoolMS.zip...
-powershell -NoProfile -Command "Compress-Archive -Path '%SCHOOL%' -DestinationPath '%PROJECT%SchoolMS.zip' -Force"
+echo [3/3] Preparing clean package...
+if exist "%STAGE%" rmdir /s /q "%STAGE%"
+robocopy "%SCHOOL%" "%STAGE%\school-management" /E /XD ".git" "node_modules" /XF ".env" ".env.*" "php-cli.ini" ".phpunit.result.cache" >nul
+if exist "%STAGE%\school-management\bootstrap\cache\config.php" del /f /q "%STAGE%\school-management\bootstrap\cache\config.php"
+if exist "%STAGE%\school-management\bootstrap\cache\routes-v7.php" del /f /q "%STAGE%\school-management\bootstrap\cache\routes-v7.php"
+if exist "%STAGE%\school-management\bootstrap\cache\packages.php" del /f /q "%STAGE%\school-management\bootstrap\cache\packages.php"
+if exist "%STAGE%\school-management\bootstrap\cache\services.php" del /f /q "%STAGE%\school-management\bootstrap\cache\services.php"
+del /f /q "%STAGE%\school-management\storage\logs\*.log" 2>nul
+
+echo Creating SchoolMS.zip...
+powershell -NoProfile -Command "Compress-Archive -Path '%STAGE%\school-management' -DestinationPath '%PROJECT%SchoolMS.zip' -Force"
+if exist "%STAGE%" rmdir /s /q "%STAGE%"
 
 if exist "%PROJECT%SchoolMS.zip" (
     echo.

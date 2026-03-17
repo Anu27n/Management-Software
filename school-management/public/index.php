@@ -18,6 +18,17 @@ if (!extension_loaded('mbstring')) {
 $baseDir = dirname(__DIR__);
 $configCache = $baseDir . '/bootstrap/cache/config.php';
 $envFile = $baseDir . '/.env';
+$installedFile = $baseDir . '/.installed';
+
+// Fresh uploads on shared hosting should go to the installer before Laravel boots.
+if (!file_exists($installedFile) && file_exists(__DIR__ . '/installer.php')) {
+    $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+    if (!preg_match('~/((installer|clear-config-cache|run-migrate)\.php)?$~i', $requestPath)) {
+        header('Location: installer.php');
+        exit;
+    }
+}
+
 if (file_exists($configCache)) {
     $cacheTime = filemtime($configCache);
     $envNewer = file_exists($envFile) && filemtime($envFile) > $cacheTime;
