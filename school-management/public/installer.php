@@ -182,10 +182,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ensureRuntimeDirectories($basePath);
 
             // Step 1: Write .env file
-            try {
-                $appKey = 'base64:' . base64_encode(random_bytes(32));
-            } catch (Throwable $e) {
-                $errors[] = 'Could not generate APP_KEY: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');
+            $appKey = generateBase64AppKey();
+            if ($appKey === null) {
+                $errors[] = 'Could not generate APP_KEY on this server. Enable OpenSSL in PHP settings and try again.';
                 $appKey = '';
             }
 
@@ -208,6 +207,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (file_put_contents($basePath . '/.env', $envContent) === false) {
                 $errors[] = 'Could not write .env file. Check folder permissions.';
+            }
+
+            if (empty($errors) && !ensureEnvAppKey($basePath . '/.env', $appKey)) {
+                $errors[] = 'The installer could not save APP_KEY into .env. Check file permissions, then run the installer again.';
             }
 
             // Force Laravel to use the .env we just wrote: delete cached config (artisan config:clear often fails on shared hosting)
@@ -389,6 +392,51 @@ function ensureRuntimeDirectories(string $basePath): void
     // Core writable directories for Laravel on shared hosting
     @chmod($basePath . '/storage', 0775);
     @chmod($basePath . '/bootstrap/cache', 0775);
+}
+
+function generateBase64AppKey(): ?string
+{
+    try {
+        return 'base64:' . base64_encode(random_bytes(32));
+    } catch (Throwable $e) {
+        if (function_exists('openssl_random_pseudo_bytes')) {
+            $bytes = openssl_random_pseudo_bytes(32, $strong);
+            if ($bytes !== false && strlen($bytes) === 32) {
+                return 'base64:' . base64_encode($bytes);
+            }
+        }
+    }
+
+    return null;
+}
+
+function ensureEnvAppKey(string $envFile, ?string $preferredKey = null): bool
+{
+    if (!file_exists($envFile) || !is_readable($envFile) || !is_writable($envFile)) {
+        return false;
+    }
+
+    $contents = file_get_contents($envFile);
+    if ($contents === false) {
+        return false;
+    }
+
+    if (preg_match('/^APP_KEY\s*=\s*(.+)\s*$/m', $contents, $matches) && trim((string) $matches[1]) !== '') {
+        return true;
+    }
+
+    $key = $preferredKey ?: generateBase64AppKey();
+    if ($key === null) {
+        return false;
+    }
+
+    if (preg_match('/^APP_KEY\s*=.*$/m', $contents)) {
+        $updated = preg_replace('/^APP_KEY\s*=.*$/m', 'APP_KEY=' . $key, $contents, 1);
+    } else {
+        $updated = rtrim($contents) . "\nAPP_KEY=" . $key . "\n";
+    }
+
+    return $updated !== null && file_put_contents($envFile, $updated) !== false;
 }
 
 function runArtisanCommand(string $basePath, string $command, array &$output = []): int

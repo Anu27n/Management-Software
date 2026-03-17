@@ -14,6 +14,51 @@ if (!extension_loaded('mbstring')) {
     exit;
 }
 
+function generateBase64AppKey(): ?string
+{
+    try {
+        return 'base64:' . base64_encode(random_bytes(32));
+    } catch (Throwable $e) {
+        if (function_exists('openssl_random_pseudo_bytes')) {
+            $bytes = openssl_random_pseudo_bytes(32, $strong);
+            if ($bytes !== false && strlen($bytes) === 32) {
+                return 'base64:' . base64_encode($bytes);
+            }
+        }
+    }
+
+    return null;
+}
+
+function ensureEnvAppKey(string $envFile): bool
+{
+    if (!file_exists($envFile) || !is_readable($envFile) || !is_writable($envFile)) {
+        return false;
+    }
+
+    $contents = file_get_contents($envFile);
+    if ($contents === false) {
+        return false;
+    }
+
+    if (preg_match('/^APP_KEY\s*=\s*(.+)\s*$/m', $contents, $matches) && trim((string) $matches[1]) !== '') {
+        return true;
+    }
+
+    $key = generateBase64AppKey();
+    if ($key === null) {
+        return false;
+    }
+
+    if (preg_match('/^APP_KEY\s*=.*$/m', $contents)) {
+        $updated = preg_replace('/^APP_KEY\s*=.*$/m', 'APP_KEY=' . $key, $contents, 1);
+    } else {
+        $updated = rtrim($contents) . "\nAPP_KEY=" . $key . "\n";
+    }
+
+    return $updated !== null && file_put_contents($envFile, $updated) !== false;
+}
+
 // Clear config cache when .env is newer (installer wrote it) or when app code was just updated (new deploy)
 $baseDir = dirname(__DIR__);
 $configCache = $baseDir . '/bootstrap/cache/config.php';
@@ -25,6 +70,28 @@ if (!file_exists($installedFile) && file_exists(__DIR__ . '/installer.php')) {
     $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
     if (!preg_match('~/((installer|clear-config-cache|run-migrate)\.php)?$~i', $requestPath)) {
         header('Location: installer.php');
+        exit;
+    }
+}
+
+if (file_exists($installedFile)) {
+    if (!file_exists($envFile)) {
+        http_response_code(503);
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Installation incomplete</title>';
+        echo '<style>body{font-family:sans-serif;max-width:620px;margin:2rem auto;padding:1.5rem;background:#fff7ed;}h1{color:#9a3412;}p{color:#7c2d12;line-height:1.6;}code{background:#fed7aa;padding:2px 6px;border-radius:4px;}</style></head><body>';
+        echo '<h1>Installation incomplete</h1><p>The application is marked installed, but the <code>.env</code> file is missing.</p>';
+        echo '<p>Delete <code>.installed</code> from the Laravel root and run <code>installer.php</code> again.</p></body></html>';
+        exit;
+    }
+
+    if (!ensureEnvAppKey($envFile)) {
+        http_response_code(503);
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>APP_KEY missing</title>';
+        echo '<style>body{font-family:sans-serif;max-width:620px;margin:2rem auto;padding:1.5rem;background:#fff7ed;}h1{color:#9a3412;}p{color:#7c2d12;line-height:1.6;}code{background:#fed7aa;padding:2px 6px;border-radius:4px;}</style></head><body>';
+        echo '<h1>APP_KEY missing</h1><p>The installer did not save a valid <code>APP_KEY</code> into <code>.env</code>, so Laravel cannot start.</p>';
+        echo '<p>Re-upload the latest package and run <code>installer.php</code> again, or edit <code>.env</code> and add a valid <code>APP_KEY=base64:...</code> line.</p></body></html>';
         exit;
     }
 }
