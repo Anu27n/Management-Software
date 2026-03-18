@@ -10,6 +10,7 @@ use App\Models\Student;
 use App\Models\SchoolClass;
 use App\Models\AcademicYear;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -85,6 +86,20 @@ class FeeController extends Controller
         if ($request->filled('student_id')) {
             $query->where('student_id', $request->student_id);
         }
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $query->whereHas('student', function ($studentQuery) use ($search) {
+                $studentQuery->where(function ($q) use ($search) {
+                    $q->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$search}%"])
+                        ->orWhere('admission_no', 'like', "%{$search}%")
+                        ->orWhere('father_name', 'like', "%{$search}%")
+                        ->orWhere('mother_name', 'like', "%{$search}%")
+                        ->orWhere('guardian_name', 'like', "%{$search}%");
+                });
+            });
+        }
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
@@ -99,16 +114,28 @@ class FeeController extends Controller
         return view('fees.payments', compact('payments'));
     }
 
-    public function createPayment()
+    public function createPayment(Request $request)
     {
-        $students = Student::where('status', 'active')->get();
-        $structures = FeeStructure::with(['feeCategory', 'schoolClass'])->get();
+        $students = Student::with(['schoolClass:id,name', 'section:id,name', 'parentUser:id,name'])
+            ->where('status', 'active')
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get();
         $gatewaySettings = PaymentGatewaySetting::firstOrCreate(
             ['provider' => 'razorpay'],
             ['is_enabled' => false, 'currency' => 'INR']
         );
+        $selectedStudent = null;
+        $selectedStructures = collect();
 
-        return view('fees.create-payment', compact('students', 'structures', 'gatewaySettings'));
+        if ($request->filled('student_id')) {
+            $selectedStudent = $students->firstWhere('id', (int) $request->student_id);
+            if ($selectedStudent) {
+                $selectedStructures = $this->feeStructuresForStudent($selectedStudent);
+            }
+        }
+
+        return view('fees.create-payment', compact('students', 'gatewaySettings', 'selectedStudent', 'selectedStructures'));
     }
 
     public function storePayment(Request $request)
@@ -289,12 +316,45 @@ class FeeController extends Controller
 
     public function getStudentFees(Student $student)
     {
-        $structures = FeeStructure::with('feeCategory')
-            ->where('class_id', $student->class_id)
-            ->where('academic_year_id', $student->academic_year_id)
-            ->get();
+        $structures = $this->feeStructuresForStudent($student);
 
         return response()->json($structures);
+    }
+
+    public function myFees()
+    {
+        $user = auth()->user();
+        abort_unless($user->isParent() || $user->isStudent(), 403, 'Unauthorized.');
+
+        $studentsQuery = Student::with(['schoolClass:id,name', 'section:id,name']);
+
+        if ($user->isParent()) {
+            $studentsQuery->where('parent_user_id', $user->id);
+        } else {
+            $studentsQuery->where('email', $user->email);
+        }
+
+        $students = $studentsQuery
+            ->where('status', 'active')
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get();
+
+        $studentIds = $students->pluck('id');
+        $recentPayments = FeePayment::with(['student', 'feeStructure.feeCategory'])
+            ->whereIn('student_id', $studentIds)
+            ->latest()
+            ->take(12)
+            ->get();
+
+        $feeOverview = $this->buildFeeOverviewForStudents($students);
+
+        return view('fees.my-fees', [
+            'students' => $students,
+            'recentPayments' => $recentPayments,
+            'feeOverview' => $feeOverview,
+            'gatewaySettings' => PaymentGatewaySetting::first(),
+        ]);
     }
 
     private function isValidRazorpaySignature(string $orderId, string $paymentId, string $signature, string $secret): bool
@@ -303,5 +363,49 @@ class FeeController extends Controller
         $expectedSignature = hash_hmac('sha256', $payload, $secret);
 
         return hash_equals($expectedSignature, $signature);
+    }
+
+    private function feeStructuresForStudent(Student $student): Collection
+    {
+        return FeeStructure::with(['feeCategory', 'schoolClass'])
+            ->where('class_id', $student->class_id)
+            ->where('academic_year_id', $student->academic_year_id)
+            ->orderBy('fee_category_id')
+            ->get();
+    }
+
+    private function buildFeeOverviewForStudents(Collection $students): array
+    {
+        $overviewItems = [];
+        $totalDueAmount = 0;
+        $totalPaidAmount = 0;
+
+        foreach ($students as $student) {
+            $structures = $this->feeStructuresForStudent($student);
+
+            foreach ($structures as $structure) {
+                $paidAmount = (float) FeePayment::query()
+                    ->where('student_id', $student->id)
+                    ->where('fee_structure_id', $structure->id)
+                    ->sum('amount_paid');
+
+                $dueAmount = max(0, (float) $structure->amount - $paidAmount);
+                $totalPaidAmount += $paidAmount;
+                $totalDueAmount += $dueAmount;
+
+                $overviewItems[] = [
+                    'student' => $student,
+                    'structure' => $structure,
+                    'paid_amount' => $paidAmount,
+                    'due_amount' => $dueAmount,
+                ];
+            }
+        }
+
+        return [
+            'items' => collect($overviewItems)->sortByDesc('due_amount')->values(),
+            'due_amount' => $totalDueAmount,
+            'paid_amount' => $totalPaidAmount,
+        ];
     }
 }

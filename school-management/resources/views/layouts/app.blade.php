@@ -285,6 +285,7 @@
         $canApplyLeaves = $authUser->hasPermission('leaves.apply');
         $canManageFeeStructures = $authUser->hasPermission('fees.manage');
         $canManageFeePayments = $authUser->hasPermission('fees.payments.manage');
+        $canViewOwnFees = $authUser->isParent() || $authUser->isStudent();
         $canManageSettings = $authUser->hasPermission('settings.manage');
         $canManageUsers = $authUser->hasPermission('users.manage');
         $canManageNotifications = $authUser->hasPermission('notifications.manage');
@@ -339,9 +340,17 @@
             </a>
         @endif
         @if($canManageFeePayments)
+            <a href="{{ route('fees.payments.create') }}" class="nav-link {{ request()->routeIs('fees.payments.create') ? 'active' : '' }}">
+                <i class="bi bi-lightning-charge-fill"></i> Quick Fee Record
+            </a>
             <a href="{{ route('fees.payments') }}" class="nav-link {{ request()->routeIs('fees.payments*') ? 'active' : '' }}">
                 <i class="bi bi-receipt-cutoff"></i> Fee Payments
             </a>
+        @endif
+        @if($canViewOwnFees)
+        <a href="{{ route('fees.my-fees') }}" class="nav-link {{ request()->routeIs('fees.my-fees') ? 'active' : '' }}">
+            <i class="bi bi-wallet2"></i> My Fees
+        </a>
         @endif
         @if($canViewNotices)
         <a href="{{ route('notices.index') }}" class="nav-link {{ request()->routeIs('notices.*') ? 'active' : '' }}">
@@ -459,6 +468,16 @@
                     <i class="bi {{ request()->routeIs('students.*') ? 'bi-people-fill' : 'bi-people' }}"></i>
                     <span>Students</span>
                 </a>
+            @elseif($canManageFeePayments)
+                <a href="{{ route('fees.payments.create') }}" class="bottom-nav-item {{ request()->routeIs('fees.payments.create') ? 'active' : '' }}">
+                    <i class="bi {{ request()->routeIs('fees.payments.create') ? 'bi-lightning-charge-fill' : 'bi-lightning-charge' }}"></i>
+                    <span>Quick Fee</span>
+                </a>
+            @elseif($canViewOwnFees)
+                <a href="{{ route('fees.my-fees') }}" class="bottom-nav-item {{ request()->routeIs('fees.my-fees') ? 'active' : '' }}">
+                    <i class="bi {{ request()->routeIs('fees.my-fees') ? 'bi-wallet2' : 'bi-wallet' }}"></i>
+                    <span>Fees</span>
+                </a>
             @elseif($canViewHomework)
                 <a href="{{ route('homework.index') }}" class="bottom-nav-item {{ request()->routeIs('homework.*') ? 'active' : '' }}">
                     <i class="bi {{ request()->routeIs('homework.*') ? 'bi-journal-text' : 'bi-journal' }}"></i>
@@ -476,6 +495,11 @@
                     <i class="bi {{ request()->routeIs('fees.payments*') ? 'bi-receipt-cutoff' : 'bi-receipt' }}"></i>
                     <span>Payments</span>
                 </a>
+            @elseif($canViewOwnFees)
+                <a href="{{ route('reportcards.view') }}" class="bottom-nav-item {{ request()->routeIs('reportcards.*') ? 'active' : '' }}">
+                    <i class="bi {{ request()->routeIs('reportcards.*') ? 'bi-file-earmark-bar-graph-fill' : 'bi-file-earmark-bar-graph' }}"></i>
+                    <span>Reports</span>
+                </a>
             @elseif($canManageFeeStructures)
                 <a href="{{ route('fees.categories') }}" class="bottom-nav-item {{ request()->routeIs('fees.categories','fees.structures') ? 'active' : '' }}">
                     <i class="bi {{ request()->routeIs('fees.categories','fees.structures') ? 'bi-cash-stack' : 'bi-cash' }}"></i>
@@ -486,27 +510,20 @@
                     <i class="bi {{ request()->routeIs('attendance.*') ? 'bi-calendar-check-fill' : 'bi-calendar-check' }}"></i>
                     <span>Attend.</span>
                 </a>
-            @elseif($canViewReportCards)
-                <a href="{{ $canManageReportCards ? route('reportcards.exams') : route('reportcards.view') }}" class="bottom-nav-item {{ request()->routeIs('reportcards.*') ? 'active' : '' }}">
-                    <i class="bi {{ request()->routeIs('reportcards.*') ? 'bi-file-earmark-bar-graph-fill' : 'bi-file-earmark-bar-graph' }}"></i>
-                    <span>Reports</span>
+            @elseif($canViewOwnFees && $canViewHomework)
+                <a href="{{ route('homework.index') }}" class="bottom-nav-item {{ request()->routeIs('homework.*') ? 'active' : '' }}">
+                    <i class="bi {{ request()->routeIs('homework.*') ? 'bi-journal-text' : 'bi-journal' }}"></i>
+                    <span>Homework</span>
                 </a>
-            @endif
-
-            @if($canManageAttendance)
-                <a href="{{ route('attendance.index') }}" class="bottom-nav-item {{ request()->routeIs('attendance.*') ? 'active' : '' }}">
-                    <i class="bi {{ request()->routeIs('attendance.*') ? 'bi-calendar-check-fill' : 'bi-calendar-check' }}"></i>
-                    <span>Attend.</span>
-                </a>
-            @elseif($canViewReportCards)
-                <a href="{{ $canManageReportCards ? route('reportcards.exams') : route('reportcards.view') }}" class="bottom-nav-item {{ request()->routeIs('reportcards.*') ? 'active' : '' }}">
-                    <i class="bi {{ request()->routeIs('reportcards.*') ? 'bi-file-earmark-bar-graph-fill' : 'bi-file-earmark-bar-graph' }}"></i>
-                    <span>Reports</span>
-                </a>
-            @elseif($canViewNotices)
+            @elseif($canViewOwnFees && $canViewNotices)
                 <a href="{{ route('notices.index') }}" class="bottom-nav-item {{ request()->routeIs('notices.*') ? 'active' : '' }}">
                     <i class="bi {{ request()->routeIs('notices.*') ? 'bi-megaphone-fill' : 'bi-megaphone' }}"></i>
                     <span>Notices</span>
+                </a>
+            @elseif($canViewReportCards)
+                <a href="{{ $canManageReportCards ? route('reportcards.exams') : route('reportcards.view') }}" class="bottom-nav-item {{ request()->routeIs('reportcards.*') ? 'active' : '' }}">
+                    <i class="bi {{ request()->routeIs('reportcards.*') ? 'bi-file-earmark-bar-graph-fill' : 'bi-file-earmark-bar-graph' }}"></i>
+                    <span>Reports</span>
                 </a>
             @endif
 
@@ -555,8 +572,16 @@
         </a>
         @endif
         @if($canManageFeePayments)
+        <a href="{{ route('fees.payments.create') }}" class="more-menu-item {{ request()->routeIs('fees.payments.create') ? 'active' : '' }}">
+            <i class="bi bi-lightning-charge-fill"></i> Quick Fee Record
+        </a>
         <a href="{{ route('fees.payments') }}" class="more-menu-item {{ request()->routeIs('fees.payments*') ? 'active' : '' }}">
             <i class="bi bi-receipt-cutoff"></i> Fee Payments
+        </a>
+        @endif
+        @if($canViewOwnFees)
+        <a href="{{ route('fees.my-fees') }}" class="more-menu-item {{ request()->routeIs('fees.my-fees') ? 'active' : '' }}">
+            <i class="bi bi-wallet2"></i> My Fees
         </a>
         @endif
         @if($canViewNotices)
@@ -622,6 +647,8 @@
         <a href="{{ route('leaves.create') }}" class="mobile-fab"><i class="bi bi-plus-lg"></i></a>
     @elseif($canManageFeePayments && request()->routeIs('fees.payments'))
         <a href="{{ route('fees.payments.create') }}" class="mobile-fab"><i class="bi bi-plus-lg"></i></a>
+    @elseif($canManageFeePayments && request()->routeIs('dashboard'))
+        <a href="{{ route('fees.payments.create') }}" class="mobile-fab"><i class="bi bi-lightning-charge"></i></a>
     @endif
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

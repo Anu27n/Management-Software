@@ -308,17 +308,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     @chmod($fullPath, 0775);
                 }
 
-                // Create public storage symlink if possible
-                $storageLinkOutput = [];
-                $storageLinkRet = runArtisanCommand($basePath, 'storage:link --relative', $storageLinkOutput);
-                if ($storageLinkRet !== 0) {
-                    $storageLinkRet = runArtisanCommand($basePath, 'storage:link', $storageLinkOutput);
+                // Shared hosting is more reliable without post-install optimization caches.
+                // The installer already clears stale cache files before booting Laravel.
+                foreach (['bootstrap/cache/config.php', 'bootstrap/cache/routes-v7.php', 'bootstrap/cache/packages.php', 'bootstrap/cache/services.php'] as $cacheFile) {
+                    @unlink($basePath . '/' . $cacheFile);
                 }
-
-                // Optimize for production
-                runArtisanCommand($basePath, 'config:cache', $configCacheOutput);
-                runArtisanCommand($basePath, 'route:cache', $routeCacheOutput);
-                runArtisanCommand($basePath, 'view:cache', $viewCacheOutput);
 
                 // Write lock file
                 file_put_contents($lockFile, date('Y-m-d H:i:s') . ' - Installed');
@@ -439,7 +433,7 @@ function ensureEnvAppKey(string $envFile, ?string $preferredKey = null): bool
     return $updated !== null && file_put_contents($envFile, $updated) !== false;
 }
 
-function runArtisanCommand(string $basePath, string $command, array &$output = []): int
+function runArtisanCommand(string $basePath, string $command, ?array &$output = null): int
 {
     $output = [];
 

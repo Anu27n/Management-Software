@@ -23,6 +23,14 @@
     <div class="col-6 col-lg-3">
         <div class="card table-card">
             <div class="card-body">
+                <div class="text-muted small">Cashiers</div>
+                <div class="fs-4 fw-bold">{{ $counts['cashiers'] }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card table-card">
+            <div class="card-body">
                 <div class="text-muted small">Parents</div>
                 <div class="fs-4 fw-bold">{{ $counts['parents'] }}</div>
             </div>
@@ -58,6 +66,7 @@
                     <label class="form-label">Role <span class="text-danger">*</span></label>
                     <select name="role" class="form-select" required>
                         <option value="teacher">Teacher</option>
+                        <option value="cashier">Cashier / Accountant</option>
                         <option value="parent">Parent</option>
                         <option value="student">Student</option>
                     </select>
@@ -86,7 +95,7 @@
                             </div>
                         @endforeach
                     </div>
-                    <small class="text-muted">The selected system role is always assigned automatically.</small>
+                    <small class="text-muted">If you select any custom roles here, only those roles will control access for this user.</small>
                 </div>
                 @endif
                 <div class="col-md-6">
@@ -120,6 +129,7 @@
                     <option value="">All Roles</option>
                     <option value="admin" {{ request('role') === 'admin' ? 'selected' : '' }}>Admin</option>
                     <option value="teacher" {{ request('role') === 'teacher' ? 'selected' : '' }}>Teacher</option>
+                    <option value="cashier" {{ request('role') === 'cashier' ? 'selected' : '' }}>Cashier</option>
                     <option value="parent" {{ request('role') === 'parent' ? 'selected' : '' }}>Parent</option>
                     <option value="student" {{ request('role') === 'student' ? 'selected' : '' }}>Student</option>
                 </select>
@@ -207,6 +217,7 @@
                                                 <select name="role" class="form-select" required>
                                                     <option value="admin" {{ $user->role === 'admin' ? 'selected' : '' }}>Admin</option>
                                                     <option value="teacher" {{ $user->role === 'teacher' ? 'selected' : '' }}>Teacher</option>
+                                                    <option value="cashier" {{ $user->role === 'cashier' ? 'selected' : '' }}>Cashier / Accountant</option>
                                                     <option value="parent" {{ $user->role === 'parent' ? 'selected' : '' }}>Parent</option>
                                                     <option value="student" {{ $user->role === 'student' ? 'selected' : '' }}>Student</option>
                                                 </select>

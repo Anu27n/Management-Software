@@ -54,6 +54,11 @@ class User extends Authenticatable
         return $this->hasRole('student');
     }
 
+    public function isCashier(): bool
+    {
+        return $this->hasRole('cashier');
+    }
+
     public function roles(): BelongsToMany
     {
         return $this->belongsToMany(Role::class)->withTimestamps();
@@ -61,15 +66,17 @@ class User extends Authenticatable
 
     public function hasRole(string $role): bool
     {
-        if ($this->role === $role) {
-            return true;
+        if ($this->rbacTablesExist()) {
+            $roles = $this->relationLoaded('roles')
+                ? $this->roles
+                : $this->roles()->get(['roles.id', 'roles.slug', 'roles.is_system']);
+
+            if ($roles->isNotEmpty()) {
+                return $roles->contains('slug', $role);
+            }
         }
 
-        if (!$this->rbacTablesExist()) {
-            return false;
-        }
-
-        return $this->roles()->where('slug', $role)->exists();
+        return $this->role === $role;
     }
 
     public function hasAnyRole(array $roles): bool
@@ -94,14 +101,18 @@ class User extends Authenticatable
                 ? $this->roles
                 : $this->roles()->with('permissions')->get();
 
-            foreach ($roles as $role) {
-                if (!$role->relationLoaded('permissions')) {
-                    $role->load('permissions');
+            if ($roles->isNotEmpty()) {
+                foreach ($roles as $role) {
+                    if (!$role->relationLoaded('permissions')) {
+                        $role->load('permissions');
+                    }
+
+                    if ($role->permissions->contains('slug', $permission)) {
+                        return true;
+                    }
                 }
 
-                if ($role->permissions->contains('slug', $permission)) {
-                    return true;
-                }
+                return false;
             }
         }
 
@@ -123,7 +134,12 @@ class User extends Authenticatable
                 'reportcards.manage',
                 'leaves.apply',
                 'leaves.approve',
+                'exports.manage',
+            ],
+            'cashier' => [
+                'dashboard.view',
                 'fees.payments.manage',
+                'notices.view',
                 'exports.manage',
             ],
             'parent', 'student' => [

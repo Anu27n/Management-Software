@@ -41,6 +41,8 @@ Route::middleware('auth')->group(function () {
         ->middleware('permission:reportcards.view')
         ->name('reportcards.view');
 
+    Route::get('/fees/my-fees', [FeeController::class, 'myFees'])->name('fees.my-fees');
+
     Route::middleware('permission:leaves.apply')->group(function () {
         Route::get('/leaves', [LeaveController::class, 'index'])->name('leaves.index');
         Route::get('/leaves/create', [LeaveController::class, 'create'])->name('leaves.create');

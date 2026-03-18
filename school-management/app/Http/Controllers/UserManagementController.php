@@ -37,6 +37,7 @@ class UserManagementController extends Controller
         $counts = [
             'admins' => User::where('role', 'admin')->count(),
             'teachers' => User::where('role', 'teacher')->count(),
+            'cashiers' => User::where('role', 'cashier')->count(),
             'parents' => User::where('role', 'parent')->count(),
             'students' => User::where('role', 'student')->count(),
         ];
@@ -53,7 +54,7 @@ class UserManagementController extends Controller
         $rules = [
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255|unique:users,email',
-            'role' => ['required', Rule::in(['teacher', 'parent', 'student'])],
+            'role' => ['required', Rule::in(['teacher', 'cashier', 'parent', 'student'])],
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string',
             'password' => 'required|string|min:6|confirmed',
@@ -87,7 +88,7 @@ class UserManagementController extends Controller
         $rules = [
             'name' => 'required|string|max:255',
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'role' => ['required', Rule::in(['admin', 'teacher', 'parent', 'student'])],
+            'role' => ['required', Rule::in(['admin', 'teacher', 'cashier', 'parent', 'student'])],
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string',
             'password' => 'nullable|string|min:6|confirmed',
@@ -156,7 +157,7 @@ class UserManagementController extends Controller
             ->map(fn ($id) => (int) $id)
             ->values();
 
-        if ($systemRoleId) {
+        if ($roleIds->isEmpty() && $systemRoleId) {
             $roleIds->push((int) $systemRoleId);
         }
 
