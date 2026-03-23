@@ -14,6 +14,7 @@
         @endif
     </div>
     <div class="d-flex gap-2">
+        <a href="{{ route('fees.due') }}" class="btn btn-outline-warning btn-sm"><i class="bi bi-exclamation-circle me-1"></i>Due Fees</a>
         <div class="btn-group btn-group-sm">
             <a href="{{ route('export.payments.csv', request()->query()) }}" class="btn btn-outline-success"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
             <a href="{{ route('export.payments.pdf', request()->query()) }}" class="btn btn-outline-danger"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>

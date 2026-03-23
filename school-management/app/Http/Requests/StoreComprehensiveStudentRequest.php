@@ -25,7 +25,6 @@ class StoreComprehensiveStudentRequest extends FormRequest
             'aadhaar_number' => ['required', 'regex:/^[0-9]{12}$/'],
             'student_pen_number' => ['nullable', 'string', 'max:100'],
             'category' => ['required', Rule::in(['GEN', 'SC', 'ST', 'OBC'])],
-            'class_applied_for' => ['required', 'string', 'max:100'],
 
             'class_id' => ['required', 'exists:classes,id'],
             'section_id' => ['required', 'exists:sections,id'],
@@ -64,12 +63,6 @@ class StoreComprehensiveStudentRequest extends FormRequest
             'mother_phone' => ['nullable', 'regex:/^[0-9]{10}$/'],
             'mother_email' => ['nullable', 'email', 'max:255'],
 
-            'parent_guardian_signature' => ['required', 'string', 'max:255'],
-            'declaration_date' => ['required', 'date'],
-
-            'student_name' => ['required', 'string', 'max:255'],
-            'personal_record_class' => ['required', 'string', 'max:100'],
-            'personal_record_section' => ['required', 'string', 'max:100'],
             'house' => ['nullable', 'string', 'max:100'],
             'blood_group' => ['nullable', 'string', 'max:10'],
             'height_cm' => ['nullable', 'numeric', 'min:0', 'max:300'],

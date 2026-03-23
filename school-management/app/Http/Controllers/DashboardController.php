@@ -210,8 +210,6 @@ class DashboardController extends Controller
                 $query->where(function ($noticeQuery) use ($classIds) {
                     $noticeQuery->whereNull('class_id')->orWhereIn('class_id', $classIds);
                 });
-            } else {
-                $query->whereNull('class_id');
             }
         } elseif ($user->isStudent()) {
             $classIds = Student::where('email', $user->email)->pluck('class_id')->unique()->filter();
@@ -224,8 +222,6 @@ class DashboardController extends Controller
                 $query->where(function ($noticeQuery) use ($classIds) {
                     $noticeQuery->whereNull('class_id')->orWhereIn('class_id', $classIds);
                 });
-            } else {
-                $query->whereNull('class_id');
             }
         } elseif ($user->isTeacher() || $user->isCashier()) {
             $query->whereIn('target_audience', ['all', 'teachers']);

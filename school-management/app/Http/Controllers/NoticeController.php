@@ -46,8 +46,6 @@ class NoticeController extends Controller
                     $query->where(function ($q) use ($classIds) {
                         $q->whereNull('class_id')->orWhereIn('class_id', $classIds);
                     });
-                } else {
-                    $query->whereNull('class_id');
                 }
             }
 
@@ -57,8 +55,6 @@ class NoticeController extends Controller
                     $query->where(function ($q) use ($classIds) {
                         $q->whereNull('class_id')->orWhereIn('class_id', $classIds);
                     });
-                } else {
-                    $query->whereNull('class_id');
                 }
             }
         }
@@ -77,6 +73,7 @@ class NoticeController extends Controller
     public function store(Request $request)
     {
         $this->ensureCanManageNotices();
+        $request->merge(['is_published' => $request->boolean('is_published')]);
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
@@ -90,7 +87,7 @@ class NoticeController extends Controller
         ]);
 
         $validated['created_by'] = auth()->id();
-        $validated['is_published'] = $request->has('is_published');
+        $validated['is_published'] = $request->boolean('is_published');
 
         if ($request->hasFile('attachment')) {
             $validated['attachment'] = $request->file('attachment')->store('notices', 'public');
@@ -127,6 +124,7 @@ class NoticeController extends Controller
     public function update(Request $request, Notice $notice)
     {
         $this->ensureCanManageNotices();
+        $request->merge(['is_published' => $request->boolean('is_published')]);
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
@@ -139,7 +137,7 @@ class NoticeController extends Controller
             'is_published' => 'boolean',
         ]);
 
-        $validated['is_published'] = $request->has('is_published');
+        $validated['is_published'] = $request->boolean('is_published');
 
         if ($request->hasFile('attachment')) {
             $validated['attachment'] = $request->file('attachment')->store('notices', 'public');
@@ -183,11 +181,23 @@ class NoticeController extends Controller
         }
 
         if ($user->isParent()) {
-            return Student::where('parent_user_id', $user->id)->where('class_id', $notice->class_id)->exists();
+            $studentQuery = Student::where('parent_user_id', $user->id);
+
+            if (!$studentQuery->exists()) {
+                return true;
+            }
+
+            return $studentQuery->where('class_id', $notice->class_id)->exists();
         }
 
         if ($user->isStudent()) {
-            return Student::where('email', $user->email)->where('class_id', $notice->class_id)->exists();
+            $studentQuery = Student::where('email', $user->email);
+
+            if (!$studentQuery->exists()) {
+                return true;
+            }
+
+            return $studentQuery->where('class_id', $notice->class_id)->exists();
         }
 
         return false;

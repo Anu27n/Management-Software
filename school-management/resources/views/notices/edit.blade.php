@@ -48,7 +48,8 @@
                 </div>
                 <div class="col-md-4 d-flex align-items-end">
                     <div class="form-check">
-                        <input type="checkbox" name="is_published" class="form-check-input" id="is_published" {{ $notice->is_published ? 'checked' : '' }}>
+                        <input type="hidden" name="is_published" value="0">
+                        <input type="checkbox" name="is_published" value="1" class="form-check-input" id="is_published" {{ old('is_published', (int) $notice->is_published) == 1 ? 'checked' : '' }}>
                         <label class="form-check-label" for="is_published">Published</label>
                     </div>
                 </div>

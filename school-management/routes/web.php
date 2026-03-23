@@ -14,6 +14,7 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\RolePermissionController;
+use App\Http\Controllers\QuickSearchController;
 
 // Auth routes
 Route::get('/', [AuthController::class, 'showLogin'])->name('login');
@@ -23,6 +24,7 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 // Authenticated routes
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/quick-search', [QuickSearchController::class, 'index'])->name('quick-search.index');
 
     // Shared routes for all logged-in users
     Route::get('/homework', [HomeworkController::class, 'index'])->middleware('permission:homework.view')->name('homework.index');
@@ -126,6 +128,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:fees.payments.manage')->group(function () {
         Route::get('/fees/payments', [FeeController::class, 'payments'])->name('fees.payments');
+        Route::get('/fees/due', [FeeController::class, 'dueFees'])->name('fees.due');
         Route::get('/fees/payments/create', [FeeController::class, 'createPayment'])->name('fees.payments.create');
         Route::post('/fees/payments', [FeeController::class, 'storePayment'])->name('fees.payments.store');
         Route::get('/fees/payments/{payment}', [FeeController::class, 'showPayment'])->name('fees.payments.show');

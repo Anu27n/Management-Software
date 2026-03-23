@@ -92,6 +92,96 @@
             font-size: 1.1rem; font-weight: 600; margin: 0;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
+        .quick-search-wrap {
+            margin-left: 16px;
+            flex: 1;
+            max-width: 560px;
+            position: relative;
+        }
+        .quick-search-input {
+            width: 100%;
+            border: none;
+            border-radius: 999px;
+            padding: 8px 14px 8px 36px;
+            font-size: 0.9rem;
+            outline: none;
+            background: rgba(255,255,255,0.18);
+            color: #fff;
+        }
+        .quick-search-input::placeholder {
+            color: rgba(255,255,255,0.75);
+        }
+        .quick-search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(255,255,255,0.8);
+            font-size: 0.95rem;
+            pointer-events: none;
+        }
+        .quick-search-results {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            right: 0;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+            max-height: 62vh;
+            overflow-y: auto;
+            z-index: 1060;
+            display: none;
+        }
+        .quick-search-results.show {
+            display: block;
+        }
+        .quick-search-group-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+            padding: 10px 14px 4px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+        }
+        .quick-search-group-label:first-child {
+            border-top: none;
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+        }
+        .quick-search-item {
+            display: block;
+            padding: 10px 14px;
+            text-decoration: none;
+            border-top: 1px solid #f1f5f9;
+            color: #0f172a;
+        }
+        .quick-search-item:hover {
+            background: #eff6ff;
+            color: #0f172a;
+        }
+        .quick-search-title {
+            font-size: 0.92rem;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+        .quick-search-subtitle,
+        .quick-search-meta {
+            font-size: 0.78rem;
+            color: #64748b;
+            line-height: 1.25;
+            margin-top: 2px;
+        }
+        .quick-search-status {
+            font-size: 0.74rem;
+            color: #64748b;
+            padding: 10px 14px;
+            border-top: 1px solid #f1f5f9;
+            background: #f8fafc;
+        }
         .topbar .user-section { color: rgba(255,255,255,0.9); }
         .topbar .user-section .btn {
             background: rgba(255,255,255,0.15); border: none; color: #fff;
@@ -104,6 +194,16 @@
             .topbar {
                 background: #fff; color: var(--on-surface);
                 border-bottom: 1px solid #e2e8f0; box-shadow: none;
+            }
+            .quick-search-input {
+                background: #f1f5f9;
+                color: #0f172a;
+            }
+            .quick-search-input::placeholder {
+                color: #64748b;
+            }
+            .quick-search-icon {
+                color: #64748b;
             }
             .topbar .user-section { color: var(--on-surface); }
             .topbar .user-section .btn {
@@ -220,6 +320,19 @@
             .bottom-nav { display: block; }
             .mobile-fab { display: flex; align-items: center; justify-content: center; }
             .topbar .btn-toggle-sidebar { display: none; }
+            .quick-search-wrap {
+                margin-left: 10px;
+                max-width: none;
+            }
+            .quick-search-input {
+                font-size: 0.85rem;
+                padding: 8px 12px 8px 32px;
+            }
+            .quick-search-results {
+                left: -56px;
+                right: -12px;
+                max-height: 56vh;
+            }
             .page-content { padding: 16px 12px; }
 
             /* Material-style cards */
@@ -349,6 +462,9 @@
             <a href="{{ route('fees.payments') }}" class="nav-link {{ request()->routeIs('fees.payments*') ? 'active' : '' }}">
                 <i class="bi bi-receipt-cutoff"></i> Fee Payments
             </a>
+            <a href="{{ route('fees.due') }}" class="nav-link {{ request()->routeIs('fees.due') ? 'active' : '' }}">
+                <i class="bi bi-exclamation-circle"></i> Due Fees
+            </a>
         @endif
         @if($canViewOwnFees)
         <a href="{{ route('fees.my-fees') }}" class="nav-link {{ request()->routeIs('fees.my-fees') ? 'active' : '' }}">
@@ -411,6 +527,17 @@
                 <i class="bi bi-list fs-5"></i>
             </button>
             <h6 class="page-title">@yield('page-title', 'Dashboard')</h6>
+            <div class="quick-search-wrap">
+                <i class="bi bi-search quick-search-icon"></i>
+                <input
+                    type="search"
+                    id="quickSearchInput"
+                    class="quick-search-input"
+                    placeholder="Quick Search: students, fees, parents, staff"
+                    autocomplete="off"
+                >
+                <div id="quickSearchResults" class="quick-search-results" role="listbox" aria-label="Quick search results"></div>
+            </div>
             <div class="ms-auto d-flex align-items-center gap-2 user-section">
                 <span class="text-muted small d-none d-md-inline">{{ auth()->user()->name }}</span>
                 <div class="dropdown">
@@ -594,6 +721,9 @@
         <a href="{{ route('fees.payments') }}" class="more-menu-item {{ request()->routeIs('fees.payments*') ? 'active' : '' }}">
             <i class="bi bi-receipt-cutoff"></i> Fee Payments
         </a>
+        <a href="{{ route('fees.due') }}" class="more-menu-item {{ request()->routeIs('fees.due') ? 'active' : '' }}">
+            <i class="bi bi-exclamation-circle"></i> Due Fees
+        </a>
         @endif
         @if($canViewOwnFees)
         <a href="{{ route('fees.my-fees') }}" class="more-menu-item {{ request()->routeIs('fees.my-fees') ? 'active' : '' }}">
@@ -696,6 +826,139 @@
             el.addEventListener('touchstart', function() { this.style.opacity = '0.7'; }, {passive: true});
             el.addEventListener('touchend', function() { this.style.opacity = '1'; }, {passive: true});
         });
+
+        (function initQuickSearch() {
+            var searchInput = document.getElementById('quickSearchInput');
+            var searchResults = document.getElementById('quickSearchResults');
+            if (!searchInput || !searchResults) {
+                return;
+            }
+
+            var activeController = null;
+            var debounceTimer = null;
+
+            function escapeHtml(value) {
+                return String(value || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            function hideResults() {
+                searchResults.classList.remove('show');
+            }
+
+            function showStatus(message) {
+                searchResults.innerHTML = '<div class="quick-search-status">' + escapeHtml(message) + '</div>';
+                searchResults.classList.add('show');
+            }
+
+            function renderGroups(payload) {
+                var groups = payload && payload.groups ? payload.groups : {};
+                var labels = {
+                    students: 'Students',
+                    parents: 'Parents',
+                    fee_records: 'Fee Records',
+                    staff: 'Staff'
+                };
+
+                var html = '';
+                var total = 0;
+
+                Object.keys(labels).forEach(function(groupKey) {
+                    var items = Array.isArray(groups[groupKey]) ? groups[groupKey] : [];
+                    if (!items.length) {
+                        return;
+                    }
+
+                    total += items.length;
+                    html += '<div class="quick-search-group-label">' + labels[groupKey] + '</div>';
+
+                    items.forEach(function(item) {
+                        html += '<a class="quick-search-item" href="' + escapeHtml(item.url || '#') + '">';
+                        html += '<div class="quick-search-title">' + escapeHtml(item.title || '-') + '</div>';
+                        if (item.subtitle) {
+                            html += '<div class="quick-search-subtitle">' + escapeHtml(item.subtitle) + '</div>';
+                        }
+                        if (item.meta) {
+                            html += '<div class="quick-search-meta">' + escapeHtml(item.meta) + '</div>';
+                        }
+                        html += '</a>';
+                    });
+                });
+
+                if (!total) {
+                    showStatus('No matching records found.');
+                    return;
+                }
+
+                html += '<div class="quick-search-status">' + total + ' result(s) in ' + (payload.took_ms || 0) + ' ms</div>';
+                searchResults.innerHTML = html;
+                searchResults.classList.add('show');
+            }
+
+            function performSearch(term) {
+                if (activeController) {
+                    activeController.abort();
+                }
+
+                activeController = new AbortController();
+                showStatus('Searching...');
+
+                fetch('{{ route('quick-search.index') }}?q=' + encodeURIComponent(term), {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    signal: activeController.signal
+                })
+                    .then(function(response) { return response.ok ? response.json() : Promise.reject(new Error('Search failed')); })
+                    .then(renderGroups)
+                    .catch(function(error) {
+                        if (error && error.name === 'AbortError') {
+                            return;
+                        }
+
+                        showStatus('Unable to fetch search results right now.');
+                    });
+            }
+
+            searchInput.addEventListener('input', function() {
+                var term = searchInput.value.trim();
+
+                clearTimeout(debounceTimer);
+
+                if (term.length < 2) {
+                    hideResults();
+                    return;
+                }
+
+                debounceTimer = setTimeout(function() {
+                    performSearch(term);
+                }, 250);
+            });
+
+            searchInput.addEventListener('focus', function() {
+                if (searchResults.innerHTML.trim() !== '') {
+                    searchResults.classList.add('show');
+                }
+            });
+
+            document.addEventListener('click', function(event) {
+                if (!searchResults.contains(event.target) && event.target !== searchInput) {
+                    hideResults();
+                }
+            });
+
+            searchInput.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') {
+                    hideResults();
+                    searchInput.blur();
+                }
+            });
+        })();
     </script>
     @stack('scripts')
 </body>

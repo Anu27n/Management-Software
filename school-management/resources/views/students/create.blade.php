@@ -71,10 +71,6 @@
                         <option value="OBC" {{ old('category') == 'OBC' ? 'selected' : '' }}>OBC</option>
                     </select>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">Class Applied For <span class="text-danger">*</span></label>
-                    <input type="text" name="class_applied_for" class="form-control" value="{{ old('class_applied_for') }}" required>
-                </div>
             </div>
 
             <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-geo-alt me-1"></i>Contact & Address</h6>
@@ -157,17 +153,8 @@
                 <div class="col-md-4"><label class="form-label">Email</label><input type="email" name="mother_email" class="form-control" value="{{ old('mother_email') }}"></div>
             </div>
 
-            <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-pen me-1"></i>Declaration</h6>
-            <div class="row g-3 mb-4">
-                <div class="col-md-4"><label class="form-label">Parent/Guardian Signature <span class="text-danger">*</span></label><input type="text" name="parent_guardian_signature" class="form-control" value="{{ old('parent_guardian_signature') }}" required></div>
-                <div class="col-md-3"><label class="form-label">Declaration Date <span class="text-danger">*</span></label><input type="date" name="declaration_date" class="form-control" value="{{ old('declaration_date', date('Y-m-d')) }}" required></div>
-            </div>
-
             <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-journal-text me-1"></i>Personal Record</h6>
             <div class="row g-3 mb-4">
-                <div class="col-md-3"><label class="form-label">Student Name <span class="text-danger">*</span></label><input type="text" name="student_name" class="form-control" value="{{ old('student_name') }}" required></div>
-                <div class="col-md-3"><label class="form-label">Class <span class="text-danger">*</span></label><input type="text" name="personal_record_class" class="form-control" value="{{ old('personal_record_class') }}" required></div>
-                <div class="col-md-3"><label class="form-label">Section <span class="text-danger">*</span></label><input type="text" name="personal_record_section" class="form-control" value="{{ old('personal_record_section') }}" required></div>
                 <div class="col-md-3"><label class="form-label">House</label><input type="text" name="house" class="form-control" value="{{ old('house') }}"></div>
                 <div class="col-md-2"><label class="form-label">Blood Group</label><input type="text" name="blood_group" class="form-control" value="{{ old('blood_group') }}"></div>
                 <div class="col-md-2"><label class="form-label">Height (cm)</label><input type="number" step="0.01" name="height_cm" class="form-control" value="{{ old('height_cm') }}"></div>

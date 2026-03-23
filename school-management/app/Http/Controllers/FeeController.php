@@ -10,7 +10,9 @@ use App\Models\Student;
 use App\Models\SchoolClass;
 use App\Models\AcademicYear;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -112,6 +114,57 @@ class FeeController extends Controller
 
         $payments = $query->latest()->paginate(20);
         return view('fees.payments', compact('payments'));
+    }
+
+    public function dueFees(Request $request)
+    {
+        $studentsQuery = Student::with(['schoolClass:id,name', 'section:id,name'])
+            ->where('status', 'active');
+
+        if ($request->filled('class_id')) {
+            $studentsQuery->where('class_id', $request->class_id);
+        }
+
+        if ($request->filled('section_id')) {
+            $studentsQuery->where('section_id', $request->section_id);
+        }
+
+        if ($request->filled('search')) {
+            $search = trim((string) $request->search);
+
+            $studentsQuery->where(function ($query) use ($search) {
+                $query->where('first_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$search}%"])
+                    ->orWhere('admission_no', 'like', "%{$search}%");
+            });
+        }
+
+        $students = $studentsQuery
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get();
+
+        $dueRows = $this->buildDueRowsForStudents($students);
+        $perPage = 20;
+        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $pageItems = $dueRows->forPage($currentPage, $perPage)->values();
+        $dueStudents = new LengthAwarePaginator(
+            $pageItems,
+            $dueRows->count(),
+            $perPage,
+            $currentPage,
+            ['path' => url()->current(), 'query' => $request->query()]
+        );
+
+        $classes = SchoolClass::orderBy('name')->get();
+
+        return view('fees.due-fees', [
+            'dueStudents' => $dueStudents,
+            'classes' => $classes,
+            'totalDueAmount' => $dueRows->sum('total_due'),
+            'totalDueHeads' => $dueRows->sum('due_heads'),
+        ]);
     }
 
     public function createPayment(Request $request)
@@ -522,6 +575,72 @@ class FeeController extends Controller
             'due_amount' => $totalDueAmount,
             'paid_amount' => $totalPaidAmount,
         ];
+    }
+
+    private function buildDueRowsForStudents(Collection $students): Collection
+    {
+        if ($students->isEmpty()) {
+            return collect();
+        }
+
+        $classIds = $students->pluck('class_id')->filter()->unique()->values();
+        $academicYearIds = $students->pluck('academic_year_id')->filter()->unique()->values();
+
+        $structures = FeeStructure::with('feeCategory:id,name')
+            ->whereIn('class_id', $classIds)
+            ->whereIn('academic_year_id', $academicYearIds)
+            ->get()
+            ->groupBy(fn ($structure) => $structure->class_id . '-' . $structure->academic_year_id);
+
+        $paymentMap = FeePayment::query()
+            ->select('student_id', 'fee_structure_id', DB::raw('SUM(amount_paid) as total_paid'))
+            ->whereIn('student_id', $students->pluck('id'))
+            ->groupBy('student_id', 'fee_structure_id')
+            ->get()
+            ->mapWithKeys(function ($payment) {
+                $key = $payment->student_id . '-' . $payment->fee_structure_id;
+                return [$key => (float) $payment->total_paid];
+            });
+
+        return $students->map(function ($student) use ($structures, $paymentMap) {
+            $structureKey = $student->class_id . '-' . $student->academic_year_id;
+            $studentStructures = $structures->get($structureKey, collect());
+
+            $totalAssigned = 0.0;
+            $totalPaid = 0.0;
+            $totalDue = 0.0;
+            $dueBreakdown = [];
+
+            foreach ($studentStructures as $structure) {
+                $assigned = (float) $structure->amount;
+                $paidKey = $student->id . '-' . $structure->id;
+                $paid = min($assigned, (float) ($paymentMap[$paidKey] ?? 0.0));
+                $due = max(0, $assigned - $paid);
+
+                $totalAssigned += $assigned;
+                $totalPaid += $paid;
+                $totalDue += $due;
+
+                if ($due > 0) {
+                    $dueBreakdown[] = [
+                        'fee_head' => $structure->feeCategory?->name ?? 'N/A',
+                        'due_amount' => $due,
+                    ];
+                }
+            }
+
+            return [
+                'student' => $student,
+                'total_assigned' => $totalAssigned,
+                'total_paid' => $totalPaid,
+                'total_due' => $totalDue,
+                'due_heads' => count($dueBreakdown),
+                'breakdown' => collect($dueBreakdown)->sortByDesc('due_amount')->values(),
+            ];
+        })
+            ->filter(fn ($row) => $row['total_due'] > 0)
+            ->sortByDesc('total_due')
+            ->values();
     }
 
     private function userCanAccessStudent($user, Student $student): bool
