@@ -7,12 +7,15 @@ use App\Models\SchoolClass;
 use App\Models\Section;
 use App\Models\AcademicYear;
 use App\Models\NotificationSetting;
+use App\Models\StudentProfile;
 use App\Models\User;
+use App\Http\Requests\StoreComprehensiveStudentRequest;
 use App\Support\UserCredentialSupport;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
 
 class StudentController extends Controller
@@ -399,53 +402,21 @@ class StudentController extends Controller
             ->with('success', "Promotion completed. Promoted: {$promoteCount}, Repeated: {$repeatCount}.");
     }
 
-    public function store(Request $request)
+    public function store(StoreComprehensiveStudentRequest $request)
     {
-        $validated = $request->validate([
-            'admission_no' => 'required|unique:students,admission_no',
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'gender' => 'required|in:male,female,other',
-            'date_of_birth' => 'required|date',
-            'class_id' => 'required|exists:classes,id',
-            'section_id' => 'required|exists:sections,id',
-            'academic_year_id' => 'required|exists:academic_years,id',
-            'admission_date' => 'required|date',
-            'father_name' => 'required|string|max:255',
-            'blood_group' => 'nullable|string|max:10',
-            'religion' => 'nullable|string|max:100',
-            'caste' => 'nullable|string|max:100',
-            'nationality' => 'nullable|string|max:100',
-            'mother_tongue' => 'nullable|string|max:100',
-            'address' => 'nullable|string',
-            'city' => 'nullable|string|max:100',
-            'state' => 'nullable|string|max:100',
-            'pincode' => 'nullable|string|max:10',
-            'phone' => 'required|string|max:20',
-            'email' => 'required|email|max:255',
-            'photo' => 'nullable|image|max:2048',
-            'previous_school' => 'nullable|string|max:255',
-            'father_phone' => 'nullable|string|max:20',
-            'father_occupation' => 'nullable|string|max:255',
-            'mother_name' => 'nullable|string|max:255',
-            'mother_phone' => 'nullable|string|max:20',
-            'mother_occupation' => 'nullable|string|max:255',
-            'guardian_name' => 'nullable|string|max:255',
-            'guardian_phone' => 'nullable|string|max:20',
-            'guardian_relation' => 'nullable|string|max:100',
-        ]);
-
-        if ($request->hasFile('photo')) {
-            $validated['photo'] = $request->file('photo')->store('students', 'public');
-        }
+        $validated = $request->validated();
+        $studentData = $this->mapStudentCoreData($validated);
+        $profileData = $this->mapStudentProfileData($validated);
 
         $generatedCredentials = null;
+        $student = null;
 
-        DB::transaction(function () use (&$validated, &$generatedCredentials) {
-            [$parentUser, $generatedCredentials] = $this->resolveParentAccount($validated);
-            $validated['parent_user_id'] = $parentUser->id;
+        DB::transaction(function () use (&$studentData, &$profileData, &$generatedCredentials, &$student) {
+            [$parentUser, $generatedCredentials] = $this->resolveParentAccount($studentData);
+            $studentData['parent_user_id'] = $parentUser->id;
 
-            Student::create($validated);
+            $student = Student::create($studentData);
+            $student->profile()->create($profileData);
         });
 
         $successMessage = $generatedCredentials
@@ -461,6 +432,43 @@ class StudentController extends Controller
         }
 
         return $redirect;
+    }
+
+    public function apiIndex(Request $request): JsonResponse
+    {
+        $students = Student::with(['schoolClass:id,name', 'section:id,name', 'academicYear:id,name', 'profile'])
+            ->when($request->filled('class_id'), fn ($query) => $query->where('class_id', $request->input('class_id')))
+            ->when($request->filled('section_id'), fn ($query) => $query->where('section_id', $request->input('section_id')))
+            ->when($request->filled('academic_year_id'), fn ($query) => $query->where('academic_year_id', $request->input('academic_year_id')))
+            ->latest()
+            ->paginate((int) $request->input('per_page', 20));
+
+        return response()->json($students);
+    }
+
+    public function apiStore(StoreComprehensiveStudentRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+        $studentData = $this->mapStudentCoreData($validated);
+        $profileData = $this->mapStudentProfileData($validated);
+
+        $generatedCredentials = null;
+
+        $student = DB::transaction(function () use (&$studentData, &$profileData, &$generatedCredentials) {
+            [$parentUser, $generatedCredentials] = $this->resolveParentAccount($studentData);
+            $studentData['parent_user_id'] = $parentUser->id;
+
+            $created = Student::create($studentData);
+            $created->profile()->create($profileData);
+
+            return $created->load(['schoolClass:id,name', 'section:id,name', 'academicYear:id,name', 'profile']);
+        });
+
+        return response()->json([
+            'message' => 'Student created successfully.',
+            'student' => $student,
+            'generated_credentials' => $generatedCredentials,
+        ], 201);
     }
 
     public function show(Student $student)
@@ -552,6 +560,113 @@ class StudentController extends Controller
     public function getSections(SchoolClass $class)
     {
         return response()->json($class->sections);
+    }
+
+    private function mapStudentCoreData(array $validated): array
+    {
+        return [
+            'admission_no' => $validated['student_s_no'],
+            'first_name' => $validated['student_first_name'],
+            'last_name' => trim(($validated['student_middle_name'] ?? '') . ' ' . ($validated['student_surname'] ?? '')) ?: $validated['student_surname'] ?? 'NA',
+            'gender' => $validated['gender'],
+            'date_of_birth' => $validated['date_of_birth'],
+            'blood_group' => $validated['blood_group'] ?? null,
+            'caste' => $validated['category'],
+            'nationality' => $validated['nationality'],
+            'address' => $validated['residential_address'],
+            'phone' => $validated['father_mobile_number'],
+            'email' => $validated['father_email'] ?? ($validated['mother_email'] ?? strtolower($validated['student_s_no'] . '@school.local')),
+            'admission_date' => $validated['admission_date'],
+            'previous_school' => $validated['last_school_name'] ?? null,
+            'father_name' => $validated['father_name'],
+            'father_phone' => $validated['father_phone'] ?? null,
+            'father_occupation' => $validated['father_occupation'] ?? null,
+            'mother_name' => $validated['mother_name'],
+            'mother_phone' => $validated['mother_phone'] ?? null,
+            'mother_occupation' => $validated['mother_occupation'] ?? null,
+            'guardian_name' => $validated['guardian_name'] ?? null,
+            'guardian_phone' => $validated['phone_number'] ?? null,
+            'guardian_relation' => null,
+            'class_id' => $validated['class_id'],
+            'section_id' => $validated['section_id'],
+            'academic_year_id' => $validated['academic_year_id'],
+            'status' => 'active',
+        ];
+    }
+
+    private function mapStudentProfileData(array $validated): array
+    {
+        return [
+            'student_s_no' => $validated['student_s_no'],
+            'student_surname' => $validated['student_surname'] ?? null,
+            'student_first_name' => $validated['student_first_name'],
+            'student_middle_name' => $validated['student_middle_name'] ?? null,
+            'nationality' => $validated['nationality'],
+            'aadhaar_number' => $validated['aadhaar_number'],
+            'student_pen_number' => $validated['student_pen_number'] ?? null,
+            'category' => $validated['category'],
+            'class_applied_for' => $validated['class_applied_for'],
+            'residential_address' => $validated['residential_address'],
+            'father_mobile_number' => $validated['father_mobile_number'],
+            'mother_mobile_number' => $validated['mother_mobile_number'],
+            'last_school_name' => $validated['last_school_name'] ?? null,
+            'last_class' => $validated['last_class'] ?? null,
+            'report_card_attached' => (bool) $validated['report_card_attached'],
+            'transfer_certificate_attached' => (bool) $validated['transfer_certificate_attached'],
+            'is_child_healthy' => $validated['is_child_healthy'],
+            'health_report_attached' => (bool) $validated['health_report_attached'],
+            'father_name' => $validated['father_name'],
+            'father_education' => $validated['father_education'] ?? null,
+            'father_medium_of_instruction' => $validated['father_medium_of_instruction'] ?? null,
+            'father_occupation' => $validated['father_occupation'] ?? null,
+            'father_business_designation' => $validated['father_business_designation'] ?? null,
+            'father_organization_name' => $validated['father_organization_name'] ?? null,
+            'father_office_address' => $validated['father_office_address'] ?? null,
+            'father_phone' => $validated['father_phone'] ?? null,
+            'father_email' => $validated['father_email'] ?? null,
+            'mother_name' => $validated['mother_name'],
+            'mother_education' => $validated['mother_education'] ?? null,
+            'mother_medium_of_instruction' => $validated['mother_medium_of_instruction'] ?? null,
+            'mother_occupation' => $validated['mother_occupation'] ?? null,
+            'mother_business_designation' => $validated['mother_business_designation'] ?? null,
+            'mother_organization_name' => $validated['mother_organization_name'] ?? null,
+            'mother_office_address' => $validated['mother_office_address'] ?? null,
+            'mother_phone' => $validated['mother_phone'] ?? null,
+            'mother_email' => $validated['mother_email'] ?? null,
+            'parent_guardian_signature' => $validated['parent_guardian_signature'],
+            'declaration_date' => $validated['declaration_date'],
+            'student_name' => $validated['student_name'],
+            'personal_record_class' => $validated['personal_record_class'],
+            'personal_record_section' => $validated['personal_record_section'],
+            'house' => $validated['house'] ?? null,
+            'blood_group' => $validated['blood_group'] ?? null,
+            'height_cm' => $validated['height_cm'] ?? null,
+            'weight_kg' => $validated['weight_kg'] ?? null,
+            'transport_mode' => $validated['transport_mode'],
+            'guardian_name' => $validated['guardian_name'] ?? null,
+            'phone_number' => $validated['phone_number'] ?? null,
+            'office_address' => $validated['office_address'] ?? null,
+            'father_mobile' => $validated['father_mobile'] ?? null,
+            'mother_mobile' => $validated['mother_mobile'] ?? null,
+            'sibling_1_name' => $validated['sibling_1_name'] ?? null,
+            'sibling_1_class' => $validated['sibling_1_class'] ?? null,
+            'sibling_2_name' => $validated['sibling_2_name'] ?? null,
+            'sibling_2_class' => $validated['sibling_2_class'] ?? null,
+            'bpl_beneficiary' => $validated['bpl_beneficiary'],
+            'father_signature' => $validated['father_signature'] ?? null,
+            'mother_signature' => $validated['mother_signature'] ?? null,
+            'guardian_signature' => $validated['guardian_signature'] ?? null,
+            'registration_receipt_number' => $validated['registration_receipt_number'] ?? null,
+            'registration_amount' => $validated['registration_amount'] ?? null,
+            'class_section_allotted' => $validated['class_section_allotted'] ?? null,
+            'date_of_admission' => $validated['date_of_admission'] ?? null,
+            'fee_booklet_number' => $validated['fee_booklet_number'] ?? null,
+            'security_receipt_number' => $validated['security_receipt_number'] ?? null,
+            'security_amount' => $validated['security_amount'] ?? null,
+            'remarks' => $validated['remarks'] ?? null,
+            'principal_signature' => $validated['principal_signature'] ?? null,
+            'office_incharge_signature' => $validated['office_incharge_signature'] ?? null,
+        ];
     }
 
     private function resolveParentAccount(array $validated, ?Student $student = null): array

@@ -75,6 +75,8 @@ Route::middleware('auth')->group(function () {
 
         // Students
         Route::resource('students', StudentController::class);
+        Route::get('/api/students', [StudentController::class, 'apiIndex'])->name('api.students.index');
+        Route::post('/api/students', [StudentController::class, 'apiStore'])->name('api.students.store');
         Route::get('/api/classes/{class}/sections', [StudentController::class, 'getSections'])->name('api.sections');
     });
 
