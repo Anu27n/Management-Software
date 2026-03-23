@@ -16,6 +16,9 @@ class QuickSearchController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $user = $request->user();
+        abort_unless($this->canUseQuickSearch($user), 403, 'Unauthorized.');
+
         $startedAt = microtime(true);
         $rawQuery = trim((string) $request->query('q', ''));
 
@@ -33,7 +36,6 @@ class QuickSearchController extends Controller
             ]);
         }
 
-        $user = $request->user();
         $query = mb_strtolower($rawQuery);
         $intent = $this->parseIntent($query);
 
@@ -57,6 +59,18 @@ class QuickSearchController extends Controller
             'total' => $total,
             'took_ms' => (int) round((microtime(true) - $startedAt) * 1000),
         ]);
+    }
+
+    private function canUseQuickSearch(User $user): bool
+    {
+        if ($user->isParent() || $user->isStudent()) {
+            return false;
+        }
+
+        return $user->hasAnyRole(['admin', 'teacher', 'cashier'])
+            || $user->hasPermission('students.manage')
+            || $user->hasPermission('fees.payments.manage')
+            || $user->hasPermission('users.manage');
     }
 
     private function parseIntent(string $query): array

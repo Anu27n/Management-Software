@@ -9,7 +9,19 @@
             <div class="card-body">
                 @if($students->isEmpty())
                     <div class="alert alert-warning mb-0">
-                        No student profiles are available for your account. Contact admin to link your account to a student record.
+                        @if(($isSelfServiceUser ?? false))
+                            @if(!($hasAnyStudentProfiles ?? true))
+                                No student profiles exist in the system yet. Please ask your school admin to add a student in the Students module first.
+                            @else
+                                No student profiles are available for your account. Contact admin to link your account to a student record.
+                            @endif
+                        @else
+                            @if(!($hasAnyStudentProfiles ?? true))
+                                No student profiles exist in the system yet. Please add a student in the Students module first.
+                            @else
+                                No students are currently available to apply leave for.
+                            @endif
+                        @endif
                     </div>
                 @else
                     <form method="POST" action="{{ route('leaves.store') }}" enctype="multipart/form-data">

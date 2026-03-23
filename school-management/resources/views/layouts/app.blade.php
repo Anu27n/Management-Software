@@ -403,6 +403,14 @@
         $canManageUsers = $authUser->hasPermission('users.manage');
         $canManageNotifications = $authUser->hasPermission('notifications.manage');
         $canManageRoles = $authUser->hasPermission('roles.manage');
+        $canUseQuickSearch = !$authUser->isParent()
+            && !$authUser->isStudent()
+            && (
+                $authUser->hasAnyRole(['admin', 'teacher', 'cashier'])
+                || $canManageStudents
+                || $canManageFeePayments
+                || $canManageUsers
+            );
 
         $canManageAcademic = $canManageStudents || $canManageAttendance || $canManageReportCards;
         $canManageFees = $canManageFeeStructures || $canManageFeePayments;
@@ -527,6 +535,7 @@
                 <i class="bi bi-list fs-5"></i>
             </button>
             <h6 class="page-title">@yield('page-title', 'Dashboard')</h6>
+            @if($canUseQuickSearch)
             <div class="quick-search-wrap">
                 <i class="bi bi-search quick-search-icon"></i>
                 <input
@@ -538,6 +547,7 @@
                 >
                 <div id="quickSearchResults" class="quick-search-results" role="listbox" aria-label="Quick search results"></div>
             </div>
+            @endif
             <div class="ms-auto d-flex align-items-center gap-2 user-section">
                 <span class="text-muted small d-none d-md-inline">{{ auth()->user()->name }}</span>
                 <div class="dropdown">
