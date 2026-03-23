@@ -9,6 +9,7 @@ use App\Models\Section;
 use App\Models\AcademicYear;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class LeaveController extends Controller
 {
@@ -170,6 +171,10 @@ class LeaveController extends Controller
             return;
         }
 
+        if ($user->isStudent() && Schema::hasColumn('students', 'student_user_id') && (int) ($student->student_user_id ?? 0) === (int) $user->id) {
+            return;
+        }
+
         if ($user->isStudent() && $this->isStudentLinkedToUser($student, $user)) {
             return;
         }
@@ -179,6 +184,10 @@ class LeaveController extends Controller
 
     private function isStudentLinkedToUser(Student $student, $user): bool
     {
+        if (Schema::hasColumn('students', 'student_user_id') && (int) ($student->student_user_id ?? 0) === (int) $user->id) {
+            return true;
+        }
+
         $userEmail = strtolower((string) ($user->email ?? ''));
         $studentEmail = strtolower((string) ($student->email ?? ''));
 
@@ -227,19 +236,24 @@ class LeaveController extends Controller
 
     private function applyStudentLinkScope(Builder $query, $user): void
     {
+        $userId = (int) ($user->id ?? 0);
         $email = strtolower(trim((string) ($user->email ?? '')));
         $username = strtolower(trim((string) ($user->username ?? '')));
         $phone = trim((string) ($user->phone ?? ''));
         $name = strtolower(trim((string) ($user->name ?? '')));
         $nameParts = $name !== '' ? preg_split('/\s+/', $name) : [];
-        $hasAnySignal = $email !== '' || $username !== '' || $phone !== '' || $name !== '';
+        $hasAnySignal = $userId > 0 || $email !== '' || $username !== '' || $phone !== '' || $name !== '';
 
         if (!$hasAnySignal) {
             $query->whereRaw('1 = 0');
             return;
         }
 
-        $query->where(function (Builder $studentQuery) use ($email, $username, $phone, $name, $nameParts) {
+        $query->where(function (Builder $studentQuery) use ($userId, $email, $username, $phone, $name, $nameParts) {
+            if (Schema::hasColumn('students', 'student_user_id')) {
+                $studentQuery->orWhere('student_user_id', $userId);
+            }
+
             if ($email !== '') {
                 $studentQuery->orWhereRaw('LOWER(email) = ?', [$email]);
             }
@@ -289,6 +303,10 @@ class LeaveController extends Controller
 
         $section = Section::query()->orderBy('id')->first();
         if (!$section) {
+            $section = $this->ensureDefaultSection();
+        }
+
+        if (!$section) {
             return null;
         }
 
@@ -314,7 +332,7 @@ class LeaveController extends Controller
             $suffix++;
         }
 
-        return Student::create([
+        $studentData = [
             'admission_no' => $admissionNo,
             'first_name' => $firstName,
             'last_name' => $lastName,
@@ -348,6 +366,33 @@ class LeaveController extends Controller
             'academic_year_id' => $academicYear->id,
             'parent_user_id' => null,
             'status' => 'active',
+        ];
+
+        if (Schema::hasColumn('students', 'student_user_id')) {
+            $studentData['student_user_id'] = $user->id;
+        }
+
+        return Student::create($studentData);
+    }
+
+    private function ensureDefaultSection(): ?Section
+    {
+        $section = Section::query()->orderBy('id')->first();
+        if ($section) {
+            return $section;
+        }
+
+        $class = SchoolClass::query()->orderBy('id')->first();
+        if (!$class) {
+            $class = SchoolClass::create([
+                'name' => 'Class 1',
+                'numeric_name' => '1',
+            ]);
+        }
+
+        return Section::create([
+            'class_id' => $class->id,
+            'name' => 'A',
         ]);
     }
 }

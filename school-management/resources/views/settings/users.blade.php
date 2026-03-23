@@ -68,12 +68,40 @@
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">Role <span class="text-danger">*</span></label>
-                    <select name="role" class="form-select" required>
+                    <select id="createRole" name="role" class="form-select" required>
                         <option value="teacher">Teacher</option>
                         <option value="cashier">Cashier / Accountant</option>
                         <option value="parent">Parent</option>
                         <option value="student">Student</option>
                     </select>
+                </div>
+                <div id="createLinkedStudentWrap" class="col-md-6 d-none">
+                    <label class="form-label">Linked Student (ID / Class / Section) <span class="text-danger">*</span></label>
+                    <select id="createLinkedStudent" name="linked_student_id" class="form-select">
+                        <option value="">Select Student Profile</option>
+                        @if(auth()->user()?->hasPermission('students.manage'))
+                            <option value="__create_new__">+ Create New Student...</option>
+                        @endif
+                        @foreach(($studentProfiles ?? collect()) as $studentProfile)
+                            <option
+                                value="{{ $studentProfile->id }}"
+                                data-name="{{ $studentProfile->full_name }}"
+                                data-email="{{ $studentProfile->email }}"
+                                data-phone="{{ $studentProfile->phone }}"
+                                data-admission="{{ $studentProfile->admission_no }}"
+                            >
+                                #{{ $studentProfile->id }} - {{ $studentProfile->full_name }} ({{ $studentProfile->admission_no }}) - {{ $studentProfile->schoolClass->name ?? '-' }}/{{ $studentProfile->section->name ?? '-' }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <small class="text-muted">Required for role Student. This maps login to the selected student profile.</small>
+                    @if(auth()->user()?->hasPermission('students.manage'))
+                        <div class="mt-2">
+                            <a href="{{ route('students.create') }}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">
+                                <i class="bi bi-person-plus me-1"></i>Create New Student
+                            </a>
+                        </div>
+                    @endif
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">Phone</label>
@@ -224,13 +252,44 @@
                                             </div>
                                             <div class="col-md-4">
                                                 <label class="form-label">Role</label>
-                                                <select name="role" class="form-select" required>
+                                                <select name="role" class="form-select edit-role-select" data-target="#editUser{{ $user->id }}LinkedStudentWrap" required>
                                                     <option value="admin" {{ $user->role === 'admin' ? 'selected' : '' }}>Admin</option>
                                                     <option value="teacher" {{ $user->role === 'teacher' ? 'selected' : '' }}>Teacher</option>
                                                     <option value="cashier" {{ $user->role === 'cashier' ? 'selected' : '' }}>Cashier / Accountant</option>
                                                     <option value="parent" {{ $user->role === 'parent' ? 'selected' : '' }}>Parent</option>
                                                     <option value="student" {{ $user->role === 'student' ? 'selected' : '' }}>Student</option>
                                                 </select>
+                                            </div>
+                                            @php
+                                                $linkedStudentId = ($linkedStudentByUserId[$user->id] ?? null);
+                                            @endphp
+                                            <div id="editUser{{ $user->id }}LinkedStudentWrap" class="col-md-8 {{ $user->role === 'student' ? '' : 'd-none' }}">
+                                                <label class="form-label">Linked Student (ID / Class / Section) <span class="text-danger">*</span></label>
+                                                <select name="linked_student_id" class="form-select edit-linked-student" {{ $user->role === 'student' ? 'required' : '' }}>
+                                                    <option value="">Select Student Profile</option>
+                                                    @if(auth()->user()?->hasPermission('students.manage'))
+                                                        <option value="__create_new__">+ Create New Student...</option>
+                                                    @endif
+                                                    @foreach(($studentProfiles ?? collect()) as $studentProfile)
+                                                        <option
+                                                            value="{{ $studentProfile->id }}"
+                                                            data-name="{{ $studentProfile->full_name }}"
+                                                            data-email="{{ $studentProfile->email }}"
+                                                            data-phone="{{ $studentProfile->phone }}"
+                                                            data-admission="{{ $studentProfile->admission_no }}"
+                                                            {{ (int) $linkedStudentId === (int) $studentProfile->id ? 'selected' : '' }}
+                                                        >
+                                                            #{{ $studentProfile->id }} - {{ $studentProfile->full_name }} ({{ $studentProfile->admission_no }}) - {{ $studentProfile->schoolClass->name ?? '-' }}/{{ $studentProfile->section->name ?? '-' }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                                @if(auth()->user()?->hasPermission('students.manage'))
+                                                    <div class="mt-2">
+                                                        <a href="{{ route('students.create') }}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">
+                                                            <i class="bi bi-person-plus me-1"></i>Create New Student
+                                                        </a>
+                                                    </div>
+                                                @endif
                                             </div>
                                             @if($customRoles->isNotEmpty())
                                             <div class="col-12">
@@ -297,3 +356,110 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const createStudentUrl = @json(auth()->user()?->hasPermission('students.manage') ? route('students.create') : null);
+    const createRole = document.getElementById('createRole');
+    const createLinkedWrap = document.getElementById('createLinkedStudentWrap');
+    const createLinkedSelect = document.getElementById('createLinkedStudent');
+    const createName = document.querySelector('input[name="name"]');
+    const createEmail = document.querySelector('input[name="email"]');
+    const createPhone = document.querySelector('input[name="phone"]');
+    const createUsername = document.querySelector('input[name="username"]');
+
+    function toggleCreateLinkedStudent() {
+        if (!createRole || !createLinkedWrap || !createLinkedSelect) {
+            return;
+        }
+
+        const isStudentRole = createRole.value === 'student';
+        createLinkedWrap.classList.toggle('d-none', !isStudentRole);
+        createLinkedSelect.required = isStudentRole;
+
+        if (!isStudentRole) {
+            createLinkedSelect.value = '';
+        }
+    }
+
+    function hydrateCreateFieldsFromStudent() {
+        if (!createLinkedSelect) {
+            return;
+        }
+
+        const opt = createLinkedSelect.options[createLinkedSelect.selectedIndex];
+        if (!opt || !opt.value) {
+            return;
+        }
+
+        if (opt.value === '__create_new__') {
+            if (createStudentUrl) {
+                window.open(createStudentUrl, '_blank', 'noopener');
+            }
+            createLinkedSelect.value = '';
+            return;
+        }
+
+        if (createName && !createName.value.trim()) {
+            createName.value = opt.dataset.name || '';
+        }
+
+        if (createEmail && !createEmail.value.trim() && (opt.dataset.email || '').trim() !== '') {
+            createEmail.value = opt.dataset.email;
+        }
+
+        if (createPhone && !createPhone.value.trim() && (opt.dataset.phone || '').trim() !== '') {
+            createPhone.value = opt.dataset.phone;
+        }
+
+        if (createUsername && !createUsername.value.trim() && (opt.dataset.admission || '').trim() !== '') {
+            createUsername.value = opt.dataset.admission;
+        }
+    }
+
+    if (createRole) {
+        createRole.addEventListener('change', toggleCreateLinkedStudent);
+        toggleCreateLinkedStudent();
+    }
+
+    if (createLinkedSelect) {
+        createLinkedSelect.addEventListener('change', hydrateCreateFieldsFromStudent);
+    }
+
+    document.querySelectorAll('.edit-role-select').forEach(function (roleSelect) {
+        const wrapSelector = roleSelect.getAttribute('data-target');
+        const linkedWrap = wrapSelector ? document.querySelector(wrapSelector) : null;
+        const linkedSelect = linkedWrap ? linkedWrap.querySelector('select[name="linked_student_id"]') : null;
+
+        if (linkedSelect) {
+            linkedSelect.addEventListener('change', function () {
+                if (linkedSelect.value === '__create_new__') {
+                    if (createStudentUrl) {
+                        window.open(createStudentUrl, '_blank', 'noopener');
+                    }
+                    linkedSelect.value = '';
+                }
+            });
+        }
+
+        const toggle = function () {
+            if (!linkedWrap || !linkedSelect) {
+                return;
+            }
+
+            const isStudentRole = roleSelect.value === 'student';
+            linkedWrap.classList.toggle('d-none', !isStudentRole);
+            linkedSelect.required = isStudentRole;
+
+            if (!isStudentRole) {
+                linkedSelect.value = '';
+            }
+        };
+
+        roleSelect.addEventListener('change', toggle);
+        toggle();
+    });
+});
+</script>
+@endpush

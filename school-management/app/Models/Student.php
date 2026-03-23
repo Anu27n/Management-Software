@@ -17,7 +17,7 @@ class Student extends Model
         'father_name', 'father_phone', 'father_occupation',
         'mother_name', 'mother_phone', 'mother_occupation',
         'guardian_name', 'guardian_phone', 'guardian_relation',
-        'class_id', 'section_id', 'academic_year_id', 'parent_user_id', 'status',
+        'class_id', 'section_id', 'academic_year_id', 'parent_user_id', 'student_user_id', 'status',
     ];
 
     protected $casts = [
@@ -48,6 +48,11 @@ class Student extends Model
     public function parentUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'parent_user_id');
+    }
+
+    public function studentUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'student_user_id');
     }
 
     public function profile(): HasOne
