@@ -89,6 +89,7 @@ if (file_exists($lockFile)) {
 
 $step = isset($_GET['step']) ? (int)$_GET['step'] : 1;
 $errors = [];
+$installWarnings = [];
 $success = '';
 
 // Handle form submissions
@@ -229,15 +230,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!function_exists('mb_split')) {
                     $errors[] = 'PHP extension mbstring is required to run migrations. Enable it in your hosting PHP settings (Hostinger: hPanel → Advanced → PHP Configuration → mbstring), then click Install again.';
                 } else {
-                    // Step 2: Run artisan commands
-                    $configClearRet = runArtisanCommand($basePath, 'config:clear', $out1);
-                    if ($configClearRet !== 0) {
-                        $errors[] = 'config:clear failed: ' . htmlspecialchars(implode("\n", $out1), ENT_QUOTES, 'UTF-8');
+                    // Step 2: Run optional artisan maintenance commands.
+                    // Shared hosting may block console execution, so we log failures
+                    // and continue instead of stopping the installation.
+                    if (!runOptionalArtisanCommand($basePath, 'config:clear', $out1)) {
+                        $installWarnings[] = 'config:clear was skipped because the server could not run it.';
                     }
 
-                    $cacheClearRet = runArtisanCommand($basePath, 'cache:clear', $out2);
-                    if ($cacheClearRet !== 0) {
-                        $errors[] = 'cache:clear failed: ' . htmlspecialchars(implode("\n", $out2), ENT_QUOTES, 'UTF-8');
+                    if (!runOptionalArtisanCommand($basePath, 'cache:clear', $out2)) {
+                        $installWarnings[] = 'cache:clear was skipped because the server could not run it.';
                     }
 
                     // Run migrations
@@ -433,6 +434,41 @@ function ensureEnvAppKey(string $envFile, ?string $preferredKey = null): bool
     return $updated !== null && file_put_contents($envFile, $updated) !== false;
 }
 
+function logInstallerMessage(string $basePath, string $message): void
+{
+    ensureRuntimeDirectories($basePath);
+
+    $logLine = '[' . date('Y-m-d H:i:s') . '] ' . $message . PHP_EOL;
+    @file_put_contents($basePath . '/storage/logs/installer.log', $logLine, FILE_APPEND);
+    @error_log('[Installer] ' . $message);
+}
+
+function runOptionalArtisanCommand(string $basePath, string $command, ?array &$output = null): bool
+{
+    try {
+        $status = runArtisanCommand($basePath, $command, $output);
+
+        if ($status === 0) {
+            return true;
+        }
+
+        $details = trim(implode("\n", array_filter($output ?? [])));
+        logInstallerMessage(
+            $basePath,
+            sprintf(
+                'Optional artisan command "%s" failed and was skipped. %s',
+                $command,
+                $details !== '' ? $details : 'No additional output was returned.'
+            )
+        );
+    } catch (Throwable $e) {
+        $output = ['Optional artisan command failed: ' . $e->getMessage()];
+        logInstallerMessage($basePath, sprintf('Optional artisan command "%s" threw an exception and was skipped: %s', $command, $e->getMessage()));
+    }
+
+    return false;
+}
+
 function runArtisanCommand(string $basePath, string $command, ?array &$output = null): int
 {
     $output = [];
@@ -577,6 +613,14 @@ if ($step === 1 || $step === 2) {
         <div class="alert alert-danger">
             <?php foreach ($errors as $err): ?>
             <div><?= $err ?></div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if (!empty($installWarnings)): ?>
+        <div class="alert alert-warning">
+            <?php foreach ($installWarnings as $warning): ?>
+            <div><?= htmlspecialchars($warning, ENT_QUOTES, 'UTF-8') ?></div>
             <?php endforeach; ?>
         </div>
         <?php endif; ?>
@@ -753,3 +797,6 @@ if ($step === 1 || $step === 2) {
 </div>
 </body>
 </html>
+
+
+
