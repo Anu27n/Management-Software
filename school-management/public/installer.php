@@ -216,7 +216,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Force Laravel to use the .env we just wrote: delete cached config (artisan config:clear often fails on shared hosting)
             if (empty($errors)) {
-                $cacheFiles = ['bootstrap/cache/config.php', 'bootstrap/cache/routes-v7.php', 'bootstrap/cache/packages.php', 'bootstrap/cache/services.php'];
+                $cacheFiles = ['bootstrap/cache/config.php', 'bootstrap/cache/routes-v7.php'];
                 foreach ($cacheFiles as $f) {
                     $path = $basePath . '/' . $f;
                     if (file_exists($path)) {
@@ -309,10 +309,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     @chmod($fullPath, 0775);
                 }
 
-                // Shared hosting is more reliable without post-install optimization caches.
-                // The installer already clears stale cache files before booting Laravel.
-                foreach (['bootstrap/cache/config.php', 'bootstrap/cache/routes-v7.php', 'bootstrap/cache/packages.php', 'bootstrap/cache/services.php'] as $cacheFile) {
-                    @unlink($basePath . '/' . $cacheFile);
+                // Warm the common Laravel caches when the host allows it.
+                // These are optional so shared hosting installs still complete.
+                $optionalOptimizeCommands = [
+                    'config:cache',
+                    'route:cache',
+                    'view:cache',
+                ];
+
+                foreach ($optionalOptimizeCommands as $optionalOptimizeCommand) {
+                    $optimizeOutput = [];
+                    if (!runOptionalArtisanCommand($basePath, $optionalOptimizeCommand, $optimizeOutput)) {
+                        $installWarnings[] = $optionalOptimizeCommand . ' was skipped because the server could not run it.';
+                    }
                 }
 
                 // Write lock file
@@ -797,6 +806,8 @@ if ($step === 1 || $step === 2) {
 </div>
 </body>
 </html>
+
+
 
 
 
