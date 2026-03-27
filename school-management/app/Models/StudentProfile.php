@@ -65,6 +65,7 @@ class StudentProfile extends Model
         'sibling_2_name',
         'sibling_2_class',
         'bpl_beneficiary',
+        'rte',
         'father_signature',
         'mother_signature',
         'guardian_signature',

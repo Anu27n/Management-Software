@@ -10,6 +10,7 @@ use App\Models\NotificationSetting;
 use App\Models\StudentProfile;
 use App\Models\User;
 use App\Http\Requests\StoreComprehensiveStudentRequest;
+use App\Support\ClassEligibility;
 use App\Support\UserCredentialSupport;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -596,6 +597,9 @@ class StudentController extends Controller
 
     private function mapStudentProfileData(array $validated): array
     {
+        $className = SchoolClass::query()->whereKey($validated['class_id'])->value('name');
+        $isRteEligible = ClassEligibility::isRteEligible($className);
+
         return [
             'student_s_no' => $validated['student_s_no'],
             'student_surname' => $validated['student_surname'] ?? null,
@@ -646,7 +650,8 @@ class StudentController extends Controller
             'sibling_1_class' => $validated['sibling_1_class'] ?? null,
             'sibling_2_name' => $validated['sibling_2_name'] ?? null,
             'sibling_2_class' => $validated['sibling_2_class'] ?? null,
-            'bpl_beneficiary' => $validated['bpl_beneficiary'],
+            'bpl_beneficiary' => $validated['bpl_beneficiary'] ?? 'na',
+            'rte' => $isRteEligible ? ($validated['rte'] ?? null) : null,
             'father_signature' => $validated['father_signature'] ?? null,
             'mother_signature' => $validated['mother_signature'] ?? null,
             'guardian_signature' => $validated['guardian_signature'] ?? null,
@@ -797,3 +802,4 @@ class StudentController extends Controller
         }
     }
 }
+

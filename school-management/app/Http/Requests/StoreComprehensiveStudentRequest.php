@@ -2,8 +2,11 @@
 
 namespace App\Http\Requests;
 
+use App\Models\SchoolClass;
+use App\Support\ClassEligibility;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreComprehensiveStudentRequest extends FormRequest
 {
@@ -81,7 +84,8 @@ class StoreComprehensiveStudentRequest extends FormRequest
             'sibling_2_name' => ['nullable', 'string', 'max:255'],
             'sibling_2_class' => ['nullable', 'string', 'max:100'],
 
-            'bpl_beneficiary' => ['required', Rule::in(['yes', 'no'])],
+            'bpl_beneficiary' => ['nullable', Rule::in(['yes', 'no', 'na'])],
+            'rte' => ['nullable', Rule::in(['yes', 'no'])],
             'father_signature' => ['nullable', 'string', 'max:255'],
             'mother_signature' => ['nullable', 'string', 'max:255'],
             'guardian_signature' => ['nullable', 'string', 'max:255'],
@@ -106,6 +110,30 @@ class StoreComprehensiveStudentRequest extends FormRequest
             'aadhaar_number' => 'Aadhaar number',
             'father_mobile_number' => 'father mobile number',
             'mother_mobile_number' => 'mother mobile number',
+            'rte' => 'RTE',
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            $classId = $this->input('class_id');
+
+            if (!$classId) {
+                return;
+            }
+
+            $className = SchoolClass::query()->whereKey($classId)->value('name');
+            $isRteEligible = ClassEligibility::isRteEligible($className);
+            $rte = $this->input('rte');
+
+            if ($isRteEligible && blank($rte)) {
+                $validator->errors()->add('rte', 'The RTE field is required for classes up to 8th.');
+            }
+
+            if (!$isRteEligible && filled($rte)) {
+                $validator->errors()->add('rte', 'The RTE field is only allowed for classes up to 8th.');
+            }
+        });
     }
 }

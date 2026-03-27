@@ -188,12 +188,14 @@
                 <div class="col-md-3"><label class="form-label">Sibling 2 Name</label><input type="text" name="sibling_2_name" class="form-control" value="{{ old('sibling_2_name') }}"></div>
                 <div class="col-md-3"><label class="form-label">Sibling 2 Class</label><input type="text" name="sibling_2_class" class="form-control" value="{{ old('sibling_2_class') }}"></div>
                 <div class="col-md-3">
-                    <label class="form-label">BPL Beneficiary <span class="text-danger">*</span></label>
-                    <select name="bpl_beneficiary" class="form-select" required>
-                        <option value="yes" {{ old('bpl_beneficiary', 'no') == 'yes' ? 'selected' : '' }}>Yes</option>
-                        <option value="no" {{ old('bpl_beneficiary', 'no') == 'no' ? 'selected' : '' }}>No</option>
+                    <label class="form-label">BPL Beneficiary</label>
+                    <select name="bpl_beneficiary" class="form-select">
+                        <option value="yes" {{ old('bpl_beneficiary', 'na') == 'yes' ? 'selected' : '' }}>Yes</option>
+                        <option value="no" {{ old('bpl_beneficiary', 'na') == 'no' ? 'selected' : '' }}>No</option>
+                        <option value="na" {{ old('bpl_beneficiary', 'na') == 'na' ? 'selected' : '' }}>NA</option>
                     </select>
                 </div>
+
                 <div class="col-md-3"><label class="form-label">Father Signature</label><input type="text" name="father_signature" class="form-control" value="{{ old('father_signature') }}"></div>
                 <div class="col-md-3"><label class="form-label">Mother Signature</label><input type="text" name="mother_signature" class="form-control" value="{{ old('mother_signature') }}"></div>
                 <div class="col-md-3"><label class="form-label">Guardian Signature</label><input type="text" name="guardian_signature" class="form-control" value="{{ old('guardian_signature') }}"></div>
@@ -220,8 +222,16 @@
                     <select name="class_id" id="class_id" class="form-select" required>
                         <option value="">Select Class</option>
                         @foreach($classes as $class)
-                            <option value="{{ $class->id }}" data-sections='@json($class->sections)' {{ old('class_id') == $class->id ? 'selected' : '' }}>{{ $class->name }}</option>
+                            <option value="{{ $class->id }}" data-sections='@json($class->sections)' data-rte-eligible="{{ \App\Support\ClassEligibility::isRteEligible($class->name) ? '1' : '0' }}" {{ old('class_id') == $class->id ? 'selected' : '' }}>{{ $class->name }}</option>
                         @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3" id="rte_field_wrapper" style="display: none;">
+                    <label class="form-label">RTE <span class="text-danger">*</span></label>
+                    <select name="rte" id="rte" class="form-select" disabled>
+                        <option value="">Select</option>
+                        <option value="yes" {{ old('rte', 'no') == 'yes' ? 'selected' : '' }}>Yes</option>
+                        <option value="no" {{ old('rte', 'no') == 'no' ? 'selected' : '' }}>No</option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -257,6 +267,8 @@
 <script>
     const classSelect = document.getElementById('class_id');
     const sectionSelect = document.getElementById('section_id');
+    const rteFieldWrapper = document.getElementById('rte_field_wrapper');
+    const rteSelect = document.getElementById('rte');
 
     function bindSections() {
         sectionSelect.innerHTML = '<option value="">Select Section</option>';
@@ -272,7 +284,30 @@
         });
     }
 
-    classSelect.addEventListener('change', bindSections);
+    function toggleRteField() {
+        const option = classSelect.options[classSelect.selectedIndex];
+        const shouldShowRte = option && option.dataset.rteEligible === '1';
+
+        rteFieldWrapper.style.display = shouldShowRte ? '' : 'none';
+        rteSelect.disabled = !shouldShowRte;
+        rteSelect.required = shouldShowRte;
+
+        if (!shouldShowRte) {
+            rteSelect.value = '';
+        }
+    }
+
+    classSelect.addEventListener('change', function () {
+        bindSections();
+        toggleRteField();
+    });
+
+    if (!classSelect.value && classSelect.options.length === 2) {
+        classSelect.selectedIndex = 1;
+    }
+
     bindSections();
+    toggleRteField();
 </script>
 @endpush
+
