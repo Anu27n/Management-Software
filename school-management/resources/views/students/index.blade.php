@@ -94,9 +94,13 @@
                         </span>
                     </td>
                     <td>
-                        <div class="btn-group btn-group-sm">
-                            <a href="{{ route('students.show', $student) }}" class="btn btn-outline-primary" title="View"><i class="bi bi-eye"></i></a>
-                            <a href="{{ route('students.edit', $student) }}" class="btn btn-outline-warning" title="Edit"><i class="bi bi-pencil"></i></a>
+                        <div class="d-flex flex-wrap gap-1">
+                            <a href="{{ route('students.show', $student) }}" class="btn btn-outline-primary btn-sm" title="See Detailed Info">
+                                <i class="bi bi-eye me-1"></i>See Detailed Info
+                            </a>
+                            <a href="{{ route('students.edit', $student) }}" class="btn btn-outline-warning btn-sm" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </a>
                             <form action="{{ route('students.destroy', $student) }}" method="POST" onsubmit="return confirm('Are you sure?')">
                                 @csrf @method('DELETE')
                                 <button class="btn btn-outline-danger btn-sm" title="Delete"><i class="bi bi-trash"></i></button>
@@ -115,3 +119,4 @@
     @endif
 </div>
 @endsection
+

@@ -68,9 +68,8 @@ class User extends Authenticatable
     public function hasRole(string $role): bool
     {
         if ($this->rbacTablesExist()) {
-            $roles = $this->relationLoaded('roles')
-                ? $this->roles
-                : $this->roles()->get(['roles.id', 'roles.slug', 'roles.is_system']);
+            $this->loadMissing('roles:id,slug,is_system');
+            $roles = $this->roles;
 
             if ($roles->isNotEmpty()) {
                 return $roles->contains('slug', $role);
@@ -98,16 +97,11 @@ class User extends Authenticatable
         }
 
         if ($this->rbacTablesExist()) {
-            $roles = $this->relationLoaded('roles')
-                ? $this->roles
-                : $this->roles()->with('permissions')->get();
+            $this->loadMissing('roles.permissions');
+            $roles = $this->roles;
 
             if ($roles->isNotEmpty()) {
                 foreach ($roles as $role) {
-                    if (!$role->relationLoaded('permissions')) {
-                        $role->load('permissions');
-                    }
-
                     if ($role->permissions->contains('slug', $permission)) {
                         return true;
                     }

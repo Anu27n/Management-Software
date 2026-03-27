@@ -13,6 +13,7 @@ use App\Http\Requests\StoreComprehensiveStudentRequest;
 use App\Support\ClassEligibility;
 use App\Support\UserCredentialSupport;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Http\Request;
@@ -23,7 +24,26 @@ class StudentController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Student::with(['schoolClass', 'section', 'academicYear']);
+        $query = Student::query()
+            ->select([
+                'id',
+                'admission_no',
+                'first_name',
+                'last_name',
+                'father_name',
+                'father_phone',
+                'phone',
+                'class_id',
+                'section_id',
+                'academic_year_id',
+                'status',
+                'created_at',
+            ])
+            ->with([
+                'schoolClass:id,name',
+                'section:id,name',
+                'academicYear:id,name',
+            ]);
 
         if ($request->filled('class_id')) {
             $query->where('class_id', $request->class_id);
@@ -43,17 +63,25 @@ class StudentController extends Controller
             });
         }
 
-        $students = $query->latest()->paginate(20);
-        $classes = SchoolClass::all();
-        $sections = Section::all();
+        $students = $query->latest()->paginate(20)->withQueryString();
+        $classes = Cache::remember('students:index:classes', now()->addMinutes(10), fn () => SchoolClass::query()->select(['id', 'name'])->orderBy('name')->get());
+        $sections = Cache::remember('students:index:sections', now()->addMinutes(10), fn () => Section::query()->select(['id', 'name', 'class_id'])->orderBy('name')->get());
 
         return view('students.index', compact('students', 'classes', 'sections'));
     }
 
     public function create()
     {
-        $classes = SchoolClass::with('sections')->get();
-        $academicYears = AcademicYear::all();
+        $classes = Cache::remember('students:create:classes', now()->addMinutes(10), fn () => SchoolClass::query()
+            ->select(['id', 'name'])
+            ->with('sections:id,class_id,name')
+            ->orderBy('name')
+            ->get());
+        $academicYears = Cache::remember('students:create:academic-years', now()->addMinutes(10), fn () => AcademicYear::query()
+            ->select(['id', 'name', 'is_active', 'start_date'])
+            ->orderByDesc('is_active')
+            ->orderByDesc('start_date')
+            ->get());
 
         return view('students.create', compact('classes', 'academicYears'));
     }
@@ -474,7 +502,20 @@ class StudentController extends Controller
 
     public function show(Student $student)
     {
-        $student->load(['schoolClass', 'section', 'academicYear', 'attendances', 'feePayments.feeStructure.feeCategory', 'examResults.exam', 'examResults.subject']);
+        $student->load([
+            'schoolClass:id,name',
+            'section:id,name',
+            'academicYear:id,name',
+            'profile',
+            'parentUser:id,name,email,phone,username',
+            'attendances:id,student_id,date,status,remarks',
+            'feePayments:id,student_id,fee_structure_id,amount_paid,payment_date,status,receipt_no',
+            'feePayments.feeStructure:id,fee_category_id',
+            'feePayments.feeStructure.feeCategory:id,name',
+            'examResults:id,student_id,exam_id,subject_id,marks_obtained,grade',
+            'examResults.exam:id,name',
+            'examResults.subject:id,name',
+        ]);
         return view('students.show', compact('student'));
     }
 
@@ -802,4 +843,5 @@ class StudentController extends Controller
         }
     }
 }
+
 

@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -39,17 +40,23 @@ class QuickSearchController extends Controller
         $query = mb_strtolower($rawQuery);
         $intent = $this->parseIntent($query);
 
-        $students = $this->searchStudents($user, $rawQuery, $intent);
-        $parents = $this->searchParents($user, $rawQuery, $intent);
-        $feeRecords = $this->searchFeeRecords($user, $rawQuery, $intent);
-        $staff = $this->searchStaff($user, $rawQuery);
+        $groups = Cache::remember(
+            'quick-search:' . $user->id . ':' . md5($rawQuery),
+            now()->addSeconds(30),
+            function () use ($user, $rawQuery, $intent) {
+                $students = $this->searchStudents($user, $rawQuery, $intent);
+                $parents = $this->searchParents($user, $rawQuery, $intent);
+                $feeRecords = $this->searchFeeRecords($user, $rawQuery, $intent);
+                $staff = $this->searchStaff($user, $rawQuery);
 
-        $groups = [
-            'students' => $students->values()->all(),
-            'parents' => $parents->values()->all(),
-            'fee_records' => $feeRecords->values()->all(),
-            'staff' => $staff->values()->all(),
-        ];
+                return [
+                    'students' => $students->values()->all(),
+                    'parents' => $parents->values()->all(),
+                    'fee_records' => $feeRecords->values()->all(),
+                    'staff' => $staff->values()->all(),
+                ];
+            }
+        );
 
         $total = collect($groups)->sum(fn ($items) => count($items));
 
@@ -495,3 +502,4 @@ class QuickSearchController extends Controller
         return route('fees.my-fees');
     }
 }
+

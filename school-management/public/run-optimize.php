@@ -1,7 +1,7 @@
 <?php
 /**
- * One-time upgrade migration runner for shared hosting.
- * Open it once in the browser after uploading an updated package, then delete it.
+ * One-time optimizer for shared hosting.
+ * Open it once in the browser after upload, then delete it.
  */
 header('Content-Type: text/html; charset=utf-8');
 
@@ -53,9 +53,9 @@ function ensureEnvAppKey(string $envFile): bool
     return $updated !== null && file_put_contents($envFile, $updated) !== false;
 }
 
-echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Run update migrations</title>';
-echo '<style>body{font-family:sans-serif;max-width:720px;margin:40px auto;padding:20px;} .ok{color:green;} .err{color:#b91c1c;} pre{background:#f5f5f5;padding:12px;overflow:auto;}</style></head><body>';
-echo '<h1>Run update migrations</h1>';
+echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Optimize application</title>';
+echo '<style>body{font-family:sans-serif;max-width:760px;margin:40px auto;padding:20px;} .ok{color:green;} .warn{color:#b45309;} .err{color:#b91c1c;} pre{background:#f5f5f5;padding:12px;overflow:auto;white-space:pre-wrap;}</style></head><body>';
+echo '<h1>Optimize application</h1>';
 
 if (!ensureEnvAppKey($envFile)) {
     echo '<p class="err"><strong>Error:</strong> APP_KEY is missing in .env and could not be repaired automatically.</p>';
@@ -68,22 +68,41 @@ try {
     @set_time_limit(0);
     @ini_set('memory_limit', '512M');
 
+    foreach (['bootstrap/cache/config.php', 'bootstrap/cache/routes-v7.php'] as $cacheFile) {
+        @unlink($basePath . '/' . $cacheFile);
+    }
+
     require $basePath . '/vendor/autoload.php';
     $app = require $basePath . '/bootstrap/app.php';
     $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
-    $status = (int) $kernel->call('migrate', ['--force' => true]);
-    $output = trim((string) $kernel->output());
 
-    if ($status === 0) {
-        echo '<p class="ok"><strong>Migrations completed successfully.</strong></p>';
-    } else {
-        echo '<p class="err"><strong>Migration command returned an error.</strong></p>';
+    $commands = [
+        'config:cache' => 'Build cached configuration',
+        'route:cache' => 'Build cached routes',
+        'view:cache' => 'Compile Blade views',
+    ];
+
+    echo '<ul>';
+    foreach ($commands as $command => $label) {
+        $status = (int) $kernel->call($command);
+        $output = trim((string) $kernel->output());
+
+        if ($status === 0) {
+            echo '<li class="ok"><strong>' . htmlspecialchars($command, ENT_QUOTES, 'UTF-8') . '</strong>: ' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . ' completed.</li>';
+        } else {
+            echo '<li class="warn"><strong>' . htmlspecialchars($command, ENT_QUOTES, 'UTF-8') . '</strong>: skipped or failed, but the app can still run.</li>';
+        }
+
+        if ($output !== '') {
+            echo '<pre>' . htmlspecialchars($output, ENT_QUOTES, 'UTF-8') . '</pre>';
+        }
     }
+    echo '</ul>';
 
-    echo '<pre>' . htmlspecialchars($output ?: 'No output', ENT_QUOTES, 'UTF-8') . '</pre>';
+    echo '<p class="ok"><strong>Optimization finished.</strong> Reload the site and test the speed again.</p>';
 } catch (Throwable $e) {
     echo '<p class="err"><strong>Error:</strong> ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . '</p>';
 }
 
-echo '<p><strong>Security:</strong> Delete <code>run-update-migrations.php</code> from the server after this finishes.</p>';
+echo '<p><strong>Security:</strong> Delete <code>run-optimize.php</code> from the server after this finishes.</p>';
 echo '</body></html>';

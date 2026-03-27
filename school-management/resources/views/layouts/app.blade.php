@@ -375,6 +375,32 @@
         @media (display-mode: standalone) {
             .status-bar-spacer { display: block; height: env(safe-area-inset-top, 0px); background: var(--primary); }
         }
+
+        /* Pagination fallback so links stay usable even if CDN styles are delayed. */
+        .pagination {
+            --bs-pagination-font-size: 0.95rem;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+        }
+        .pagination .page-link {
+            min-width: 2.5rem;
+            min-height: 2.5rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.95rem;
+            line-height: 1.2;
+            border-radius: 0.65rem;
+        }
+        .pagination .page-item:first-child .page-link,
+        .pagination .page-item:last-child .page-link {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        .pagination svg {
+            width: 1rem;
+            height: 1rem;
+        }
     </style>
     @stack('styles')
 </head>

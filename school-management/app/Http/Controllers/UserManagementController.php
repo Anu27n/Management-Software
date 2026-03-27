@@ -7,6 +7,7 @@ use App\Models\Student;
 use App\Models\User;
 use App\Support\UserCredentialSupport;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -17,7 +18,9 @@ class UserManagementController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::with('roles');
+        $query = User::query()
+            ->select(['id', 'name', 'email', 'username', 'role', 'phone', 'is_active', 'created_at'])
+            ->with('roles:id,name,is_system');
 
         if ($request->filled('role')) {
             $query->where('role', $request->role);
@@ -39,16 +42,24 @@ class UserManagementController extends Controller
 
         $users = $query->latest()->paginate(20)->withQueryString();
 
+        $roleCounts = Cache::remember('users:role-counts', now()->addMinutes(5), function () {
+            return User::query()
+                ->selectRaw('role, COUNT(*) as total')
+                ->whereIn('role', ['admin', 'teacher', 'cashier', 'parent', 'student'])
+                ->groupBy('role')
+                ->pluck('total', 'role');
+        });
+
         $counts = [
-            'admins' => User::where('role', 'admin')->count(),
-            'teachers' => User::where('role', 'teacher')->count(),
-            'cashiers' => User::where('role', 'cashier')->count(),
-            'parents' => User::where('role', 'parent')->count(),
-            'students' => User::where('role', 'student')->count(),
+            'admins' => (int) ($roleCounts['admin'] ?? 0),
+            'teachers' => (int) ($roleCounts['teacher'] ?? 0),
+            'cashiers' => (int) ($roleCounts['cashier'] ?? 0),
+            'parents' => (int) ($roleCounts['parent'] ?? 0),
+            'students' => (int) ($roleCounts['student'] ?? 0),
         ];
 
         $customRoles = Schema::hasTable('roles')
-            ? Role::where('is_system', false)->orderBy('name')->get()
+            ? Cache::remember('users:custom-roles', now()->addMinutes(5), fn () => Role::query()->select(['id', 'name'])->where('is_system', false)->orderBy('name')->get())
             : collect();
 
         $studentProfiles = collect();
@@ -81,6 +92,7 @@ class UserManagementController extends Controller
 
     public function store(Request $request)
     {
+        Cache::forget('users:role-counts');
         $hasUsernameColumn = Schema::hasColumn('users', 'username');
         $rules = [
             'name' => 'required|string|max:255',
@@ -152,6 +164,7 @@ class UserManagementController extends Controller
 
     public function update(Request $request, User $user)
     {
+        Cache::forget('users:role-counts');
         $hasUsernameColumn = Schema::hasColumn('users', 'username');
         $rules = [
             'name' => 'required|string|max:255',
@@ -240,6 +253,7 @@ class UserManagementController extends Controller
             return back()->with('error', 'At least one admin account must remain.');
         }
 
+        Cache::forget('users:role-counts');
         $user->delete();
 
         return redirect()->route('settings.users')->with('success', 'User account deleted successfully.');
