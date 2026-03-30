@@ -606,10 +606,15 @@ class StudentController extends Controller
 
     private function mapStudentCoreData(array $validated): array
     {
+        $studentLastName = trim(implode(' ', array_filter([
+            trim((string) ($validated['student_middle_name'] ?? '')),
+            trim((string) ($validated['student_surname'] ?? '')),
+        ], fn ($value) => $value !== '')));
+
         return [
             'admission_no' => $validated['student_s_no'],
             'first_name' => $validated['student_first_name'],
-            'last_name' => trim(($validated['student_middle_name'] ?? '') . ' ' . ($validated['student_surname'] ?? '')) ?: $validated['student_surname'] ?? 'NA',
+            'last_name' => $studentLastName,
             'gender' => $validated['gender'],
             'date_of_birth' => $validated['date_of_birth'],
             'blood_group' => $validated['blood_group'] ?? null,
@@ -643,11 +648,11 @@ class StudentController extends Controller
 
         return [
             'student_s_no' => $validated['student_s_no'],
-            'student_surname' => $validated['student_surname'] ?? null,
+            'student_surname' => filled($validated['student_surname'] ?? null) ? $validated['student_surname'] : null,
             'student_first_name' => $validated['student_first_name'],
-            'student_middle_name' => $validated['student_middle_name'] ?? null,
+            'student_middle_name' => filled($validated['student_middle_name'] ?? null) ? $validated['student_middle_name'] : null,
             'nationality' => $validated['nationality'],
-            'aadhaar_number' => $validated['aadhaar_number'],
+            'aadhaar_number' => filled($validated['aadhaar_number'] ?? null) ? $validated['aadhaar_number'] : null,
             'student_pen_number' => $validated['student_pen_number'] ?? null,
             'category' => $validated['category'],
             'residential_address' => $validated['residential_address'],

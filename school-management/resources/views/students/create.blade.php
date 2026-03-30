@@ -54,8 +54,8 @@
                     <input type="text" name="nationality" class="form-control" value="{{ old('nationality', 'Indian') }}" required>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Aadhaar Number <span class="text-danger">*</span></label>
-                    <input type="text" name="aadhaar_number" class="form-control" maxlength="12" value="{{ old('aadhaar_number') }}" required>
+                    <label class="form-label">Aadhaar Number</label>
+                    <input type="text" name="aadhaar_number" class="form-control" maxlength="12" value="{{ old('aadhaar_number') }}">
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">PEN Number</label>
@@ -167,11 +167,9 @@
                     <label class="form-label">Transport Mode <span class="text-danger">*</span></label>
                     <select name="transport_mode" class="form-select" required>
                         <option value="">Select</option>
-                        <option value="parents" {{ old('transport_mode') == 'parents' ? 'selected' : '' }}>parents</option>
-                        <option value="van" {{ old('transport_mode') == 'van' ? 'selected' : '' }}>van</option>
-                        <option value="auto" {{ old('transport_mode') == 'auto' ? 'selected' : '' }}>auto</option>
-                        <option value="rickshaw" {{ old('transport_mode') == 'rickshaw' ? 'selected' : '' }}>rickshaw</option>
-                        <option value="self" {{ old('transport_mode') == 'self' ? 'selected' : '' }}>self</option>
+                        <option value="parents" {{ old('transport_mode') == 'parents' ? 'selected' : '' }}>Parents</option>
+                        <option value="van/auto/rickshaw" {{ old('transport_mode') == 'van/auto/rickshaw' ? 'selected' : '' }}>Van/auto/rickshaw</option>
+                        <option value="self" {{ old('transport_mode') == 'self' ? 'selected' : '' }}>Self</option>
                     </select>
                 </div>
             </div>

@@ -25,7 +25,7 @@ class StoreComprehensiveStudentRequest extends FormRequest
             'gender' => ['required', Rule::in(['male', 'female'])],
             'date_of_birth' => ['required', 'date', 'before:today'],
             'nationality' => ['required', 'string', 'max:100'],
-            'aadhaar_number' => ['required', 'regex:/^[0-9]{12}$/'],
+            'aadhaar_number' => ['nullable', 'regex:/^[0-9]{12}$/'],
             'student_pen_number' => ['nullable', 'string', 'max:100'],
             'category' => ['required', Rule::in(['GEN', 'SC', 'ST', 'OBC'])],
 
@@ -71,7 +71,7 @@ class StoreComprehensiveStudentRequest extends FormRequest
             'height_cm' => ['nullable', 'numeric', 'min:0', 'max:300'],
             'weight_kg' => ['nullable', 'numeric', 'min:0', 'max:300'],
 
-            'transport_mode' => ['required', Rule::in(['parents', 'van', 'auto', 'rickshaw', 'self'])],
+            'transport_mode' => ['required', Rule::in(['parents', 'van/auto/rickshaw', 'self'])],
 
             'guardian_name' => ['nullable', 'string', 'max:255'],
             'phone_number' => ['nullable', 'regex:/^[0-9]{10}$/'],

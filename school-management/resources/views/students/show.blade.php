@@ -108,7 +108,7 @@
                 'Sibling 1 Class' => $profile?->sibling_1_class,
                 'Sibling 2 Name' => $profile?->sibling_2_name,
                 'Sibling 2 Class' => $profile?->sibling_2_class,
-                'Transport Mode' => $profile?->transport_mode,
+                'Transport Mode' => $profile?->transport_mode ? ucfirst($profile->transport_mode) : null,
                 'Height (cm)' => $profile?->height_cm,
                 'Weight (kg)' => $profile?->weight_kg,
                 'BPL Beneficiary' => $profile?->bpl_beneficiary ? strtoupper($profile->bpl_beneficiary) : null,
