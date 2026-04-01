@@ -13,7 +13,6 @@ use App\Http\Requests\StoreComprehensiveStudentRequest;
 use App\Support\ClassEligibility;
 use App\Support\UserCredentialSupport;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Http\Request;
@@ -64,24 +63,24 @@ class StudentController extends Controller
         }
 
         $students = $query->latest()->paginate(20)->withQueryString();
-        $classes = Cache::remember('students:index:classes', now()->addMinutes(10), fn () => SchoolClass::query()->select(['id', 'name'])->orderBy('name')->get());
-        $sections = Cache::remember('students:index:sections', now()->addMinutes(10), fn () => Section::query()->select(['id', 'name', 'class_id'])->orderBy('name')->get());
+        $classes = SchoolClass::query()->select(['id', 'name'])->orderBy('name')->get();
+        $sections = Section::query()->select(['id', 'name', 'class_id'])->orderBy('name')->get();
 
         return view('students.index', compact('students', 'classes', 'sections'));
     }
 
     public function create()
     {
-        $classes = Cache::remember('students:create:classes', now()->addMinutes(10), fn () => SchoolClass::query()
+        $classes = SchoolClass::query()
             ->select(['id', 'name'])
             ->with('sections:id,class_id,name')
             ->orderBy('name')
-            ->get());
-        $academicYears = Cache::remember('students:create:academic-years', now()->addMinutes(10), fn () => AcademicYear::query()
+            ->get();
+        $academicYears = AcademicYear::query()
             ->select(['id', 'name', 'is_active', 'start_date'])
             ->orderByDesc('is_active')
             ->orderByDesc('start_date')
-            ->get());
+            ->get();
 
         return view('students.create', compact('classes', 'academicYears'));
     }
