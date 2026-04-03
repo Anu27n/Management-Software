@@ -3,8 +3,41 @@
 @section('page-title', 'Add Student - Complete Profile')
 
 @section('content')
+@php
+    $qualificationOptions = [
+        'illiterate' => 'Illiterate',
+        'school' => 'School',
+        'diploma' => 'Diploma',
+        'graduate' => 'Graduate',
+        'postgraduate' => 'Post Graduate',
+        'doctorate' => 'Doctorate',
+        'other' => 'Other',
+    ];
+
+    $mediumOptions = ['Hindi', 'English'];
+    $fatherOccupationOptions = ['Private Job', 'Government Job', 'Business', 'Professional', 'Unemployed'];
+    $motherOccupationOptions = ['Private Job', 'Government Job', 'Business', 'Professional', 'Housewife'];
+    $siblingDetails = old('sibling_details', []);
+@endphp
+
 <div class="card table-card">
     <div class="card-body">
+        @if (session('success'))
+            <div class="alert alert-success">{{ session('success') }}</div>
+        @endif
+
+        @if (session('generated_credentials'))
+            @php($credentials = session('generated_credentials'))
+            <div class="alert alert-warning">
+                <div class="fw-semibold mb-1">New parent login credentials</div>
+                <div>{{ $credentials['message'] ?? 'Copy these credentials now.' }}</div>
+                <div class="mt-2"><strong>Name:</strong> {{ $credentials['name'] ?? '-' }}</div>
+                <div><strong>Username:</strong> {{ $credentials['username'] ?? '-' }}</div>
+                <div><strong>Email:</strong> {{ $credentials['email'] ?? '-' }}</div>
+                <div><strong>Password:</strong> {{ $credentials['password'] ?? '-' }}</div>
+            </div>
+        @endif
+
         @if ($errors->any())
             <div class="alert alert-danger">
                 <strong>Please fix the following:</strong>
@@ -16,7 +49,7 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('students.store') }}" enctype="multipart/form-data">
+        <form method="POST" action="{{ route('students.store') }}" id="studentAdmissionForm">
             @csrf
 
             <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-person me-1"></i>Student Basic Details</h6>
@@ -26,10 +59,6 @@
                     <input type="text" name="student_s_no" class="form-control" value="{{ old('student_s_no') }}" required>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Surname</label>
-                    <input type="text" name="student_surname" class="form-control" value="{{ old('student_surname') }}">
-                </div>
-                <div class="col-md-3">
                     <label class="form-label">First Name <span class="text-danger">*</span></label>
                     <input type="text" name="student_first_name" class="form-control" value="{{ old('student_first_name') }}" required>
                 </div>
@@ -37,7 +66,11 @@
                     <label class="form-label">Middle Name</label>
                     <input type="text" name="student_middle_name" class="form-control" value="{{ old('student_middle_name') }}">
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-3">
+                    <label class="form-label">Surname</label>
+                    <input type="text" name="student_surname" class="form-control" value="{{ old('student_surname') }}">
+                </div>
+                <div class="col-md-4">
                     <label class="form-label">Gender <span class="text-danger">*</span></label>
                     <select name="gender" class="form-select" required>
                         <option value="">Select</option>
@@ -45,23 +78,35 @@
                         <option value="female" {{ old('gender') == 'female' ? 'selected' : '' }}>Female</option>
                     </select>
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-4">
                     <label class="form-label">Date of Birth <span class="text-danger">*</span></label>
                     <input type="date" name="date_of_birth" class="form-control" value="{{ old('date_of_birth') }}" required>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label">Nationality <span class="text-danger">*</span></label>
                     <input type="text" name="nationality" class="form-control" value="{{ old('nationality', 'Indian') }}" required>
                 </div>
-                <div class="col-md-3">
+
+                <div class="col-12 pt-2">
+                    <h6 class="fw-semibold text-primary mb-0"><i class="bi bi-card-text me-1"></i>Government / ID Details</h6>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">BPL</label>
+                    <select name="bpl_beneficiary" class="form-select">
+                        <option value="na" {{ old('bpl_beneficiary', 'na') == 'na' ? 'selected' : '' }}>NA</option>
+                        <option value="yes" {{ old('bpl_beneficiary') == 'yes' ? 'selected' : '' }}>Yes</option>
+                        <option value="no" {{ old('bpl_beneficiary') == 'no' ? 'selected' : '' }}>No</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
                     <label class="form-label">Aadhaar Number</label>
                     <input type="text" name="aadhaar_number" class="form-control" maxlength="12" value="{{ old('aadhaar_number') }}">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label">PEN Number</label>
                     <input type="text" name="student_pen_number" class="form-control" value="{{ old('student_pen_number') }}">
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-4">
                     <label class="form-label">Category <span class="text-danger">*</span></label>
                     <select name="category" class="form-select" required>
                         <option value="">Select</option>
@@ -71,31 +116,31 @@
                         <option value="OBC" {{ old('category') == 'OBC' ? 'selected' : '' }}>OBC</option>
                     </select>
                 </div>
+
+                <div class="col-12 pt-2">
+                    <h6 class="fw-semibold text-primary mb-0"><i class="bi bi-telephone me-1"></i>Parent Contact Details</h6>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Father Mobile Number</label>
+                    <input type="text" name="father_mobile_number" class="form-control" maxlength="10" value="{{ old('father_mobile_number') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Mother Mobile Number</label>
+                    <input type="text" name="mother_mobile_number" class="form-control" maxlength="10" value="{{ old('mother_mobile_number') }}">
+                </div>
             </div>
 
-            <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-geo-alt me-1"></i>Contact & Address</h6>
+            <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-geo-alt me-1"></i>Address & Previous School</h6>
             <div class="row g-3 mb-4">
                 <div class="col-md-6">
                     <label class="form-label">Residential Address <span class="text-danger">*</span></label>
                     <textarea name="residential_address" class="form-control" rows="2" required>{{ old('residential_address') }}</textarea>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Father Mobile Number <span class="text-danger">*</span></label>
-                    <input type="text" name="father_mobile_number" class="form-control" maxlength="10" value="{{ old('father_mobile_number') }}" required>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Mother Mobile Number <span class="text-danger">*</span></label>
-                    <input type="text" name="mother_mobile_number" class="form-control" maxlength="10" value="{{ old('mother_mobile_number') }}" required>
-                </div>
-            </div>
-
-            <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-building me-1"></i>Previous School</h6>
-            <div class="row g-3 mb-4">
-                <div class="col-md-4">
                     <label class="form-label">Last School Name</label>
                     <input type="text" name="last_school_name" class="form-control" value="{{ old('last_school_name') }}">
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-3">
                     <label class="form-label">Last Class</label>
                     <input type="text" name="last_class" class="form-control" value="{{ old('last_class') }}">
                 </div>
@@ -111,47 +156,136 @@
                 </div>
             </div>
 
-            <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-heart-pulse me-1"></i>Health</h6>
+            <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-person-vcard me-1"></i>Father Details</h6>
             <div class="row g-3 mb-4">
                 <div class="col-md-3">
-                    <label class="form-label">Is Child Healthy? <span class="text-danger">*</span></label>
-                    <select name="is_child_healthy" class="form-select" required>
-                        <option value="yes" {{ old('is_child_healthy', 'yes') == 'yes' ? 'selected' : '' }}>Yes</option>
-                        <option value="no" {{ old('is_child_healthy') == 'no' ? 'selected' : '' }}>No</option>
+                    <label class="form-label">Father Name</label>
+                    <input type="text" name="father_name" class="form-control" value="{{ old('father_name') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Qualification</label>
+                    <select name="father_education" class="form-select">
+                        <option value="">Select</option>
+                        @foreach($qualificationOptions as $value => $label)
+                            <option value="{{ $value }}" {{ old('father_education') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                        @endforeach
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label d-block">Health Report Attached</label>
-                    <input type="hidden" name="health_report_attached" value="0">
-                    <input type="checkbox" class="form-check-input me-2" name="health_report_attached" value="1" {{ old('health_report_attached') ? 'checked' : '' }}> Yes
+                    <label class="form-label">Medium of Instruction</label>
+                    <select name="father_medium_of_instruction" class="form-select">
+                        <option value="">Select</option>
+                        @foreach($mediumOptions as $option)
+                            <option value="{{ $option }}" {{ old('father_medium_of_instruction') === $option ? 'selected' : '' }}>{{ $option }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Occupation</label>
+                    <select name="father_occupation" class="form-select">
+                        <option value="">Select</option>
+                        @foreach($fatherOccupationOptions as $option)
+                            <option value="{{ $option }}" {{ old('father_occupation') === $option ? 'selected' : '' }}>{{ $option }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Office Address</label>
+                    <input type="text" name="father_office_address" class="form-control" value="{{ old('father_office_address') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="father_email" class="form-control" value="{{ old('father_email') }}">
                 </div>
             </div>
 
-            <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-person-vcard me-1"></i>Parents Details - Father</h6>
+            <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-person-hearts me-1"></i>Mother Details</h6>
             <div class="row g-3 mb-4">
-                <div class="col-md-3"><label class="form-label">Father Name <span class="text-danger">*</span></label><input type="text" name="father_name" class="form-control" value="{{ old('father_name') }}" required></div>
-                <div class="col-md-3"><label class="form-label">Education</label><input type="text" name="father_education" class="form-control" value="{{ old('father_education') }}"></div>
-                <div class="col-md-3"><label class="form-label">Medium of Instruction</label><input type="text" name="father_medium_of_instruction" class="form-control" value="{{ old('father_medium_of_instruction') }}"></div>
-                <div class="col-md-3"><label class="form-label">Occupation</label><input type="text" name="father_occupation" class="form-control" value="{{ old('father_occupation') }}"></div>
-                <div class="col-md-3"><label class="form-label">Business Designation</label><input type="text" name="father_business_designation" class="form-control" value="{{ old('father_business_designation') }}"></div>
-                <div class="col-md-3"><label class="form-label">Organization Name</label><input type="text" name="father_organization_name" class="form-control" value="{{ old('father_organization_name') }}"></div>
-                <div class="col-md-3"><label class="form-label">Office Address</label><input type="text" name="father_office_address" class="form-control" value="{{ old('father_office_address') }}"></div>
-                <div class="col-md-3"><label class="form-label">Phone</label><input type="text" name="father_phone" class="form-control" maxlength="10" value="{{ old('father_phone') }}"></div>
-                <div class="col-md-4"><label class="form-label">Email</label><input type="email" name="father_email" class="form-control" value="{{ old('father_email') }}"></div>
+                <div class="col-md-3">
+                    <label class="form-label">Mother Name</label>
+                    <input type="text" name="mother_name" class="form-control" value="{{ old('mother_name') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Qualification</label>
+                    <select name="mother_education" class="form-select">
+                        <option value="">Select</option>
+                        @foreach($qualificationOptions as $value => $label)
+                            <option value="{{ $value }}" {{ old('mother_education') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Medium of Instruction</label>
+                    <select name="mother_medium_of_instruction" class="form-select">
+                        <option value="">Select</option>
+                        @foreach($mediumOptions as $option)
+                            <option value="{{ $option }}" {{ old('mother_medium_of_instruction') === $option ? 'selected' : '' }}>{{ $option }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Occupation</label>
+                    <select name="mother_occupation" class="form-select">
+                        <option value="">Select</option>
+                        @foreach($motherOccupationOptions as $option)
+                            <option value="{{ $option }}" {{ old('mother_occupation') === $option ? 'selected' : '' }}>{{ $option }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Office Address</label>
+                    <input type="text" name="mother_office_address" class="form-control" value="{{ old('mother_office_address') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="mother_email" class="form-control" value="{{ old('mother_email') }}">
+                </div>
             </div>
 
-            <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-person-hearts me-1"></i>Parents Details - Mother</h6>
+            <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-shield-check me-1"></i>Guardian Details</h6>
             <div class="row g-3 mb-4">
-                <div class="col-md-3"><label class="form-label">Mother Name <span class="text-danger">*</span></label><input type="text" name="mother_name" class="form-control" value="{{ old('mother_name') }}" required></div>
-                <div class="col-md-3"><label class="form-label">Education</label><input type="text" name="mother_education" class="form-control" value="{{ old('mother_education') }}"></div>
-                <div class="col-md-3"><label class="form-label">Medium of Instruction</label><input type="text" name="mother_medium_of_instruction" class="form-control" value="{{ old('mother_medium_of_instruction') }}"></div>
-                <div class="col-md-3"><label class="form-label">Occupation</label><input type="text" name="mother_occupation" class="form-control" value="{{ old('mother_occupation') }}"></div>
-                <div class="col-md-3"><label class="form-label">Business Designation</label><input type="text" name="mother_business_designation" class="form-control" value="{{ old('mother_business_designation') }}"></div>
-                <div class="col-md-3"><label class="form-label">Organization Name</label><input type="text" name="mother_organization_name" class="form-control" value="{{ old('mother_organization_name') }}"></div>
-                <div class="col-md-3"><label class="form-label">Office Address</label><input type="text" name="mother_office_address" class="form-control" value="{{ old('mother_office_address') }}"></div>
-                <div class="col-md-3"><label class="form-label">Phone</label><input type="text" name="mother_phone" class="form-control" maxlength="10" value="{{ old('mother_phone') }}"></div>
-                <div class="col-md-4"><label class="form-label">Email</label><input type="email" name="mother_email" class="form-control" value="{{ old('mother_email') }}"></div>
+                <div class="col-md-3">
+                    <label class="form-label">Guardian Available? <span class="text-danger">*</span></label>
+                    <select name="has_guardian" id="has_guardian" class="form-select" required>
+                        <option value="0" {{ old('has_guardian', '0') == '0' ? 'selected' : '' }}>No</option>
+                        <option value="1" {{ old('has_guardian') == '1' ? 'selected' : '' }}>Yes</option>
+                    </select>
+                </div>
             </div>
+            <div class="row g-3 mb-4 {{ old('has_guardian') == '1' ? '' : 'd-none' }}" id="guardian_fields">
+                <div class="col-md-3">
+                    <label class="form-label">Guardian Name</label>
+                    <input type="text" name="guardian_name" class="form-control" value="{{ old('guardian_name') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Phone Number</label>
+                    <input type="text" name="phone_number" class="form-control" maxlength="10" value="{{ old('phone_number') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Relation</label>
+                    <input type="text" name="guardian_relation" class="form-control" value="{{ old('guardian_relation') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Address</label>
+                    <input type="text" name="office_address" class="form-control" value="{{ old('office_address') }}">
+                </div>
+            </div>
+
+            <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-people me-1"></i>Sibling Details</h6>
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <label class="form-label">Any Siblings? <span class="text-danger">*</span></label>
+                    <select name="has_siblings" id="has_siblings" class="form-select" required>
+                        <option value="0" {{ old('has_siblings', '0') == '0' ? 'selected' : '' }}>No</option>
+                        <option value="1" {{ old('has_siblings') == '1' ? 'selected' : '' }}>Yes</option>
+                    </select>
+                </div>
+                <div class="col-md-3 {{ old('has_siblings') == '1' ? '' : 'd-none' }}" id="sibling_count_wrap">
+                    <label class="form-label">Number of Siblings</label>
+                    <input type="number" min="1" max="10" name="sibling_count" id="sibling_count" class="form-control" value="{{ old('sibling_count', max(1, count($siblingDetails))) }}">
+                </div>
+            </div>
+            <div id="siblings_container" class="{{ old('has_siblings') == '1' ? '' : 'd-none' }}"></div>
 
             <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-journal-text me-1"></i>Personal Record</h6>
             <div class="row g-3 mb-4">
@@ -159,44 +293,6 @@
                 <div class="col-md-2"><label class="form-label">Blood Group</label><input type="text" name="blood_group" class="form-control" value="{{ old('blood_group') }}"></div>
                 <div class="col-md-2"><label class="form-label">Height (cm)</label><input type="number" step="0.01" name="height_cm" class="form-control" value="{{ old('height_cm') }}"></div>
                 <div class="col-md-2"><label class="form-label">Weight (kg)</label><input type="number" step="0.01" name="weight_kg" class="form-control" value="{{ old('weight_kg') }}"></div>
-            </div>
-
-            <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-bus-front me-1"></i>Transport</h6>
-            <div class="row g-3 mb-4">
-                <div class="col-md-4">
-                    <label class="form-label">Transport Mode <span class="text-danger">*</span></label>
-                    <select name="transport_mode" class="form-select" required>
-                        <option value="">Select</option>
-                        <option value="parents" {{ old('transport_mode') == 'parents' ? 'selected' : '' }}>Parents</option>
-                        <option value="van/auto/rickshaw" {{ old('transport_mode') == 'van/auto/rickshaw' ? 'selected' : '' }}>Van/auto/rickshaw</option>
-                        <option value="self" {{ old('transport_mode') == 'self' ? 'selected' : '' }}>Self</option>
-                    </select>
-                </div>
-            </div>
-
-            <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-people me-1"></i>Family, Address, Siblings & Other</h6>
-            <div class="row g-3 mb-4">
-                <div class="col-md-3"><label class="form-label">Guardian Name</label><input type="text" name="guardian_name" class="form-control" value="{{ old('guardian_name') }}"></div>
-                <div class="col-md-3"><label class="form-label">Phone Number</label><input type="text" name="phone_number" class="form-control" maxlength="10" value="{{ old('phone_number') }}"></div>
-                <div class="col-md-3"><label class="form-label">Office Address</label><input type="text" name="office_address" class="form-control" value="{{ old('office_address') }}"></div>
-                <div class="col-md-3"><label class="form-label">Father Mobile</label><input type="text" name="father_mobile" class="form-control" maxlength="10" value="{{ old('father_mobile') }}"></div>
-                <div class="col-md-3"><label class="form-label">Mother Mobile</label><input type="text" name="mother_mobile" class="form-control" maxlength="10" value="{{ old('mother_mobile') }}"></div>
-                <div class="col-md-3"><label class="form-label">Sibling 1 Name</label><input type="text" name="sibling_1_name" class="form-control" value="{{ old('sibling_1_name') }}"></div>
-                <div class="col-md-3"><label class="form-label">Sibling 1 Class</label><input type="text" name="sibling_1_class" class="form-control" value="{{ old('sibling_1_class') }}"></div>
-                <div class="col-md-3"><label class="form-label">Sibling 2 Name</label><input type="text" name="sibling_2_name" class="form-control" value="{{ old('sibling_2_name') }}"></div>
-                <div class="col-md-3"><label class="form-label">Sibling 2 Class</label><input type="text" name="sibling_2_class" class="form-control" value="{{ old('sibling_2_class') }}"></div>
-                <div class="col-md-3">
-                    <label class="form-label">BPL Beneficiary</label>
-                    <select name="bpl_beneficiary" class="form-select">
-                        <option value="yes" {{ old('bpl_beneficiary', 'na') == 'yes' ? 'selected' : '' }}>Yes</option>
-                        <option value="no" {{ old('bpl_beneficiary', 'na') == 'no' ? 'selected' : '' }}>No</option>
-                        <option value="na" {{ old('bpl_beneficiary', 'na') == 'na' ? 'selected' : '' }}>NA</option>
-                    </select>
-                </div>
-
-                <div class="col-md-3"><label class="form-label">Father Signature</label><input type="text" name="father_signature" class="form-control" value="{{ old('father_signature') }}"></div>
-                <div class="col-md-3"><label class="form-label">Mother Signature</label><input type="text" name="mother_signature" class="form-control" value="{{ old('mother_signature') }}"></div>
-                <div class="col-md-3"><label class="form-label">Guardian Signature</label><input type="text" name="guardian_signature" class="form-control" value="{{ old('guardian_signature') }}"></div>
             </div>
 
             <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-building-gear me-1"></i>Office Use Only</h6>
@@ -209,8 +305,6 @@
                 <div class="col-md-3"><label class="form-label">Security Receipt Number</label><input type="text" name="security_receipt_number" class="form-control" value="{{ old('security_receipt_number') }}"></div>
                 <div class="col-md-3"><label class="form-label">Security Amount</label><input type="number" step="0.01" name="security_amount" class="form-control" value="{{ old('security_amount') }}"></div>
                 <div class="col-md-6"><label class="form-label">Remarks</label><textarea name="remarks" class="form-control" rows="2">{{ old('remarks') }}</textarea></div>
-                <div class="col-md-3"><label class="form-label">Principal Signature</label><input type="text" name="principal_signature" class="form-control" value="{{ old('principal_signature') }}"></div>
-                <div class="col-md-3"><label class="form-label">Office Incharge Signature</label><input type="text" name="office_incharge_signature" class="form-control" value="{{ old('office_incharge_signature') }}"></div>
             </div>
 
             <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-mortarboard me-1"></i>Academic Mapping</h6>
@@ -254,7 +348,7 @@
 
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Create Student</button>
-                <a href="{{ route('students.index') }}" class="btn btn-secondary">Cancel</a>
+                <a href="{{ route('students.index') }}" class="btn btn-secondary">Go To Students</a>
             </div>
         </form>
     </div>
@@ -267,6 +361,14 @@
     const sectionSelect = document.getElementById('section_id');
     const rteFieldWrapper = document.getElementById('rte_field_wrapper');
     const rteSelect = document.getElementById('rte');
+    const hasGuardianSelect = document.getElementById('has_guardian');
+    const guardianFields = document.getElementById('guardian_fields');
+    const hasSiblingsSelect = document.getElementById('has_siblings');
+    const siblingCountWrap = document.getElementById('sibling_count_wrap');
+    const siblingCountInput = document.getElementById('sibling_count');
+    const siblingsContainer = document.getElementById('siblings_container');
+    const siblingDetails = @json(array_values($siblingDetails));
+    const siblingClassOptions = @json($classes->map(fn ($class) => ['id' => $class->id, 'name' => $class->name])->values());
 
     function bindSections() {
         sectionSelect.innerHTML = '<option value="">Select Section</option>';
@@ -295,10 +397,88 @@
         }
     }
 
+    function toggleGuardianFields() {
+        const enabled = hasGuardianSelect.value === '1';
+        guardianFields.classList.toggle('d-none', !enabled);
+    }
+
+    function buildSiblingCard(index, sibling) {
+        const isStudying = sibling && (String(sibling.is_studying) === '1' || sibling.is_studying === true);
+        const selectedClassId = sibling && sibling.class_id ? String(sibling.class_id) : '';
+        const classOptions = siblingClassOptions.map(function (schoolClass) {
+            return `<option value="${schoolClass.id}" ${selectedClassId === String(schoolClass.id) ? 'selected' : ''}>${schoolClass.name}</option>`;
+        }).join('');
+
+        return `
+            <div class="border rounded p-3 mb-3">
+                <div class="fw-semibold mb-3">Sibling ${index + 1}</div>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Name</label>
+                        <input type="text" name="sibling_details[${index}][name]" class="form-control" value="${sibling?.name ?? ''}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Studying?</label>
+                        <select name="sibling_details[${index}][is_studying]" class="form-select sibling-studying-toggle" data-index="${index}">
+                            <option value="0" ${!isStudying ? 'selected' : ''}>No</option>
+                            <option value="1" ${isStudying ? 'selected' : ''}>Yes</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 sibling-class-wrap ${isStudying ? '' : 'd-none'}" data-index="${index}">
+                        <label class="form-label">Class</label>
+                        <select name="sibling_details[${index}][class_id]" class="form-select">
+                            <option value="">Select Class</option>
+                            ${classOptions}
+                        </select>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label">Notes</label>
+                        <input type="text" name="sibling_details[${index}][notes]" class="form-control" value="${sibling?.notes ?? ''}" placeholder="Optional">
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderSiblings() {
+        const enabled = hasSiblingsSelect.value === '1';
+        siblingCountWrap.classList.toggle('d-none', !enabled);
+        siblingsContainer.classList.toggle('d-none', !enabled);
+
+        if (!enabled) {
+            siblingsContainer.innerHTML = '';
+            return;
+        }
+
+        const count = Math.max(1, parseInt(siblingCountInput.value || '1', 10));
+        siblingCountInput.value = count;
+
+        let html = '';
+        for (let i = 0; i < count; i++) {
+            html += buildSiblingCard(i, siblingDetails[i] || {});
+        }
+
+        siblingsContainer.innerHTML = html;
+    }
+
+    document.addEventListener('change', function (event) {
+        if (event.target.classList.contains('sibling-studying-toggle')) {
+            const index = event.target.dataset.index;
+            const classWrap = document.querySelector(`.sibling-class-wrap[data-index="${index}"]`);
+            if (classWrap) {
+                classWrap.classList.toggle('d-none', event.target.value !== '1');
+            }
+        }
+    });
+
     classSelect.addEventListener('change', function () {
         bindSections();
         toggleRteField();
     });
+
+    hasGuardianSelect.addEventListener('change', toggleGuardianFields);
+    hasSiblingsSelect.addEventListener('change', renderSiblings);
+    siblingCountInput?.addEventListener('input', renderSiblings);
 
     if (!classSelect.value && classSelect.options.length === 2) {
         classSelect.selectedIndex = 1;
@@ -306,6 +486,7 @@
 
     bindSections();
     toggleRteField();
+    toggleGuardianFields();
+    renderSiblings();
 </script>
 @endpush
-

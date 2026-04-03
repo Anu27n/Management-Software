@@ -120,6 +120,7 @@ class User extends Authenticatable
             'teacher' => [
                 'dashboard.view',
                 'students.manage',
+                'students.withdraw.manage',
                 'attendance.manage',
                 'homework.view',
                 'homework.manage',
@@ -133,6 +134,7 @@ class User extends Authenticatable
             ],
             'cashier' => [
                 'dashboard.view',
+                'fees.quick-entry.manage',
                 'fees.payments.manage',
                 'notices.view',
                 'exports.manage',

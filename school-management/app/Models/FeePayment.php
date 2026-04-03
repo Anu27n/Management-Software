@@ -9,7 +9,7 @@ class FeePayment extends Model
 {
     protected $fillable = [
         'student_id', 'fee_structure_id', 'amount_paid', 'discount', 'fine',
-        'payment_date', 'payment_method', 'transaction_id', 'receipt_no',
+        'payment_date', 'payment_method', 'payment_location', 'payment_channel', 'transaction_id', 'utr_number', 'cheque_number', 'receipt_no',
         'status', 'remarks', 'collected_by',
     ];
 

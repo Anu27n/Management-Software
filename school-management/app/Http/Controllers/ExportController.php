@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Student;
+use App\Models\Exam;
 use App\Models\FeePayment;
 use App\Models\Attendance;
 use App\Models\ExamResult;
 use App\Models\AcademicYear;
+use App\Support\MarksheetBuilder;
 use Illuminate\Http\Request;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -90,17 +92,29 @@ class ExportController extends Controller
     // ─── Report Card PDF ────────────────────────────
     public function reportCardPDF(Request $request)
     {
-        $request->validate(['exam_id' => 'required', 'student_id' => 'required']);
+        $request->validate([
+            'student_id' => 'required',
+            'exam_id' => 'nullable|exists:exams,id',
+            'academic_year_id' => 'required_without:exam_id|nullable|exists:academic_years,id',
+            'report_template' => 'required_without:exam_id|nullable|in:semester_1,semester_2',
+        ]);
 
         $student = Student::with(['schoolClass', 'section', 'academicYear'])->findOrFail($request->student_id);
-        $results = ExamResult::with('subject')
-            ->where('exam_id', $request->exam_id)
-            ->where('student_id', $request->student_id)
-            ->get();
+        $exam = $request->filled('exam_id')
+            ? Exam::findOrFail($request->exam_id)
+            : Exam::firstOrCreate(
+                [
+                    'academic_year_id' => $request->academic_year_id,
+                    'report_template' => $request->report_template,
+                ],
+                [
+                    'name' => $request->report_template === 'semester_2' ? 'Final / 2nd Semester' : '1st Semester',
+                    'term_number' => $request->report_template === 'semester_2' ? 2 : 1,
+                ]
+            );
+        $marksheet = (new MarksheetBuilder())->build($student, $exam);
 
-        $exam = \App\Models\Exam::findOrFail($request->exam_id);
-
-        $pdf = Pdf::loadView('exports.reportcard-pdf', compact('student', 'results', 'exam'));
+        $pdf = Pdf::loadView('exports.reportcard-pdf', compact('marksheet', 'exam', 'student'));
         return $pdf->download('reportcard-' . $student->admission_no . '.pdf');
     }
 

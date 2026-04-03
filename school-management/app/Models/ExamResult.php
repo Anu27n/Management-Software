@@ -10,11 +10,15 @@ class ExamResult extends Model
     protected $fillable = [
         'exam_id', 'student_id', 'subject_id', 'class_id',
         'marks_obtained', 'total_marks', 'grade', 'remarks',
+        'unit_test_marks', 'main_exam_marks', 'calculated_total', 'subject_category',
     ];
 
     protected $casts = [
         'marks_obtained' => 'decimal:2',
         'total_marks' => 'decimal:2',
+        'unit_test_marks' => 'decimal:2',
+        'main_exam_marks' => 'decimal:2',
+        'calculated_total' => 'decimal:2',
     ];
 
     public function exam(): BelongsTo
@@ -39,6 +43,8 @@ class ExamResult extends Model
 
     public function getPercentageAttribute(): float
     {
-        return $this->total_marks > 0 ? round(($this->marks_obtained / $this->total_marks) * 100, 2) : 0;
+        $obtained = $this->calculated_total ?? $this->marks_obtained;
+
+        return $this->total_marks > 0 ? round(($obtained / $this->total_marks) * 100, 2) : 0;
     }
 }

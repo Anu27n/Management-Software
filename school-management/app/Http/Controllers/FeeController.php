@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\FeeCategory;
+use App\Models\FeeDiscountRecord;
 use App\Models\FeeStructure;
 use App\Models\FeePayment;
+use App\Models\NotificationSetting;
 use App\Models\PaymentGatewaySetting;
 use App\Models\Student;
 use App\Models\SchoolClass;
@@ -14,6 +16,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 class FeeController extends Controller
@@ -90,11 +93,12 @@ class FeeController extends Controller
         }
         if ($request->filled('search')) {
             $search = trim($request->search);
-            $query->whereHas('student', function ($studentQuery) use ($search) {
-                $studentQuery->where(function ($q) use ($search) {
+            $fullNameExpression = $this->studentFullNameExpression();
+            $query->whereHas('student', function ($studentQuery) use ($search, $fullNameExpression) {
+                $studentQuery->where(function ($q) use ($search, $fullNameExpression) {
                     $q->where('first_name', 'like', "%{$search}%")
                         ->orWhere('last_name', 'like', "%{$search}%")
-                        ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$search}%"])
+                        ->orWhereRaw($fullNameExpression . " LIKE ?", ["%{$search}%"])
                         ->orWhere('admission_no', 'like', "%{$search}%")
                         ->orWhere('father_name', 'like', "%{$search}%")
                         ->orWhere('mother_name', 'like', "%{$search}%")
@@ -105,6 +109,9 @@ class FeeController extends Controller
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
+        if ($request->filled('payment_location')) {
+            $query->where('payment_location', $request->payment_location);
+        }
         if ($request->filled('date_from')) {
             $query->whereDate('payment_date', '>=', $request->date_from);
         }
@@ -114,6 +121,52 @@ class FeeController extends Controller
 
         $payments = $query->latest()->paginate(20);
         return view('fees.payments', compact('payments'));
+    }
+
+    public function discounts(Request $request)
+    {
+        $query = FeeDiscountRecord::query()
+            ->with([
+                'student:id,first_name,last_name,admission_no,class_id,section_id',
+                'student.schoolClass:id,name',
+                'student.section:id,name',
+                'feeStructure:id,fee_category_id,amount',
+                'feeStructure.feeCategory:id,name',
+                'payment:id,receipt_no,payment_date,status',
+                'createdBy:id,name',
+            ]);
+
+        if ($request->filled('search')) {
+            $search = trim((string) $request->search);
+            $fullNameExpression = $this->studentFullNameExpression();
+
+            $query->whereHas('student', function ($studentQuery) use ($search, $fullNameExpression) {
+                $studentQuery->where(function ($q) use ($search, $fullNameExpression) {
+                    $q->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhereRaw($fullNameExpression . " LIKE ?", ["%{$search}%"])
+                        ->orWhere('admission_no', 'like', "%{$search}%")
+                        ->orWhere('father_name', 'like', "%{$search}%");
+                });
+            });
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        $discounts = $query->latest()->paginate(20)->withQueryString();
+
+        $summary = [
+            'total_discount_amount' => (clone $query)->sum('discount_amount'),
+            'total_discount_records' => (clone $query)->count(),
+        ];
+
+        return view('fees.discounts', compact('discounts', 'summary'));
     }
 
     public function dueFees(Request $request)
@@ -131,11 +184,12 @@ class FeeController extends Controller
 
         if ($request->filled('search')) {
             $search = trim((string) $request->search);
+            $fullNameExpression = $this->studentFullNameExpression();
 
-            $studentsQuery->where(function ($query) use ($search) {
+            $studentsQuery->where(function ($query) use ($search, $fullNameExpression) {
                 $query->where('first_name', 'like', "%{$search}%")
                     ->orWhere('last_name', 'like', "%{$search}%")
-                    ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$search}%"])
+                    ->orWhereRaw($fullNameExpression . " LIKE ?", ["%{$search}%"])
                     ->orWhere('admission_no', 'like', "%{$search}%");
             });
         }
@@ -200,16 +254,21 @@ class FeeController extends Controller
             'discount' => 'nullable|numeric|min:0',
             'fine' => 'nullable|numeric|min:0',
             'payment_date' => 'required|date',
-            'payment_method' => 'required|in:cash,online,cheque,bank_transfer',
+            'payment_location' => 'required|in:school,bank',
+            'payment_channel' => 'required|in:cash,upi,cheque,bank_transfer',
             'transaction_id' => 'nullable|string|max:255',
+            'utr_number' => 'nullable|string|max:255',
+            'cheque_number' => 'nullable|string|max:255',
             'razorpay_order_id' => 'nullable|string|max:255',
             'razorpay_payment_id' => 'nullable|string|max:255',
             'razorpay_signature' => 'nullable|string|max:255',
-            'status' => 'required|in:paid,partial,pending',
+            'status' => 'required|in:paid,partial',
             'remarks' => 'nullable|string',
         ]);
 
-        if ($validated['payment_method'] === 'online') {
+        $validated['payment_method'] = $this->mapLegacyPaymentMethod($validated['payment_channel']);
+
+        if ($validated['payment_channel'] === 'upi') {
             $hasRazorpayPayload = !empty($validated['razorpay_order_id'])
                 && !empty($validated['razorpay_payment_id'])
                 && !empty($validated['razorpay_signature']);
@@ -258,7 +317,9 @@ class FeeController extends Controller
         $validated['discount'] = $validated['discount'] ?? 0;
         $validated['fine'] = $validated['fine'] ?? 0;
 
-        FeePayment::create($validated);
+        $payment = FeePayment::create($validated);
+        $this->recordDiscountIfNeeded($payment, $validated['discount'], $validated['remarks'] ?? null);
+
         return redirect()->route('fees.payments')->with('success', 'Payment recorded successfully.');
     }
 
@@ -515,6 +576,8 @@ class FeeController extends Controller
             'fine' => 0,
             'payment_date' => $validated['payment_date'],
             'payment_method' => 'online',
+            'payment_location' => 'bank',
+            'payment_channel' => 'upi',
             'transaction_id' => $validated['razorpay_payment_id'],
             'receipt_no' => 'RCP-' . date('Ymd') . '-' . str_pad(FeePayment::count() + 1, 4, '0', STR_PAD_LEFT),
             'status' => (float) $validated['amount_paid'] >= $dueAmount ? 'paid' : 'partial',
@@ -654,5 +717,94 @@ class FeeController extends Controller
         }
 
         return false;
+    }
+
+    private function mapLegacyPaymentMethod(string $paymentChannel): string
+    {
+        return match ($paymentChannel) {
+            'upi' => 'online',
+            'cash' => 'cash',
+            'cheque' => 'cheque',
+            default => 'bank_transfer',
+        };
+    }
+
+    private function studentFullNameExpression(): string
+    {
+        return DB::connection()->getDriverName() === 'sqlite'
+            ? "(COALESCE(first_name, '') || ' ' || COALESCE(last_name, ''))"
+            : "CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))";
+    }
+
+    private function recordDiscountIfNeeded(FeePayment $payment, float|int|string|null $discountAmount, ?string $remarks = null): void
+    {
+        $discount = (float) ($discountAmount ?? 0);
+
+        if ($discount <= 0) {
+            return;
+        }
+
+        FeeDiscountRecord::create([
+            'fee_payment_id' => $payment->id,
+            'student_id' => $payment->student_id,
+            'fee_structure_id' => $payment->fee_structure_id,
+            'discount_amount' => $discount,
+            'remarks' => $remarks,
+            'created_by' => auth()->id(),
+        ]);
+
+        $this->notifyAdminsAboutDiscount($payment, $discount, $remarks);
+    }
+
+    private function notifyAdminsAboutDiscount(FeePayment $payment, float $discount, ?string $remarks = null): void
+    {
+        $settings = NotificationSetting::first();
+        if (!$settings || !$settings->mail_enabled) {
+            return;
+        }
+
+        $adminEmails = \App\Models\User::query()
+            ->where('role', 'admin')
+            ->whereNotNull('email')
+            ->pluck('email')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($adminEmails->isEmpty()) {
+            return;
+        }
+
+        try {
+            if ($settings->mail_host && $settings->mail_port && $settings->mail_username) {
+                config([
+                    'mail.default' => 'smtp',
+                    'mail.mailers.smtp.host' => $settings->mail_host,
+                    'mail.mailers.smtp.port' => (int) $settings->mail_port,
+                    'mail.mailers.smtp.encryption' => $settings->mail_encryption,
+                    'mail.mailers.smtp.username' => $settings->mail_username,
+                    'mail.mailers.smtp.password' => $settings->mail_password,
+                    'mail.from.address' => $settings->mail_from_address ?: config('mail.from.address'),
+                    'mail.from.name' => $settings->mail_from_name ?: config('mail.from.name'),
+                ]);
+            }
+
+            $payment->loadMissing(['student:id,first_name,last_name,admission_no', 'feeStructure.feeCategory:id,name']);
+
+            $message = "A fee discount has been given.\n\n"
+                . 'Student: ' . ($payment->student?->full_name ?? 'N/A') . "\n"
+                . 'Admission No: ' . ($payment->student?->admission_no ?? '-') . "\n"
+                . 'Fee Head: ' . ($payment->feeStructure?->feeCategory?->name ?? '-') . "\n"
+                . 'Discount: Rs ' . number_format($discount, 2) . "\n"
+                . 'Payment Receipt: ' . ($payment->receipt_no ?? '-') . "\n"
+                . 'Remarks: ' . ($remarks ?: '-') . "\n";
+
+            Mail::raw($message, function ($mail) use ($adminEmails) {
+                $mail->to($adminEmails->all())
+                    ->subject('Fee Discount Alert');
+            });
+        } catch (Throwable $exception) {
+            // Do not block payment recording if notification delivery fails.
+        }
     }
 }

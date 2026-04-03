@@ -60,6 +60,11 @@ class Student extends Model
         return $this->hasOne(StudentProfile::class);
     }
 
+    public function withdrawal(): HasOne
+    {
+        return $this->hasOne(StudentWithdrawal::class);
+    }
+
     public function attendances(): HasMany
     {
         return $this->hasMany(Attendance::class);
@@ -73,6 +78,11 @@ class Student extends Model
     public function examResults(): HasMany
     {
         return $this->hasMany(ExamResult::class);
+    }
+
+    public function examReports(): HasMany
+    {
+        return $this->hasMany(StudentExamReport::class);
     }
 
     public function leaveApplications(): HasMany

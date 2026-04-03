@@ -414,6 +414,7 @@
     @php
         $authUser = auth()->user();
         $canManageStudents = $authUser->hasPermission('students.manage');
+        $canManageStudentWithdrawals = $authUser->hasPermission('students.withdraw.manage') || $canManageStudents;
         $canManageAttendance = $authUser->hasPermission('attendance.manage');
         $canViewHomework = $authUser->hasPermission('homework.view');
         $canManageHomework = $authUser->hasPermission('homework.manage');
@@ -422,8 +423,9 @@
         $canViewNotices = $authUser->hasPermission('notices.view');
         $canManageNotices = $authUser->hasPermission('notices.manage');
         $canApplyLeaves = $authUser->hasPermission('leaves.apply');
-        $canManageFeeStructures = $authUser->hasPermission('fees.manage');
-        $canManageFeePayments = $authUser->hasPermission('fees.payments.manage');
+        $canManageFeeStructures = $authUser->hasPermission('fees.manage') || $authUser->hasPermission('fees.setup.manage');
+        $canManageFeeGateway = $authUser->hasPermission('fees.manage') || $authUser->hasPermission('fees.gateway.manage');
+        $canManageFeePayments = $authUser->hasPermission('fees.payments.manage') || $authUser->hasPermission('fees.quick-entry.manage');
         $canViewOwnFees = $authUser->isParent() || $authUser->isStudent();
         $canManageSettings = $authUser->hasPermission('settings.manage');
         $canManageUsers = $authUser->hasPermission('users.manage');
@@ -464,6 +466,11 @@
                 <i class="bi bi-people-fill"></i> Students
             </a>
         @endif
+        @if($canManageStudentWithdrawals)
+            <a href="{{ route('students.withdrawals.index') }}" class="nav-link {{ request()->routeIs('students.withdrawals.*') ? 'active' : '' }}">
+                <i class="bi bi-box-arrow-right"></i> Withdrawals
+            </a>
+        @endif
         @if($canManageAttendance)
             <a href="{{ route('attendance.index') }}" class="nav-link {{ request()->routeIs('attendance.*') ? 'active' : '' }}">
                 <i class="bi bi-calendar-check-fill"></i> Attendance
@@ -475,7 +482,7 @@
         </a>
         @endif
         @if($canViewReportCards)
-        <a href="{{ $canManageReportCards ? route('reportcards.exams') : route('reportcards.view') }}" class="nav-link {{ request()->routeIs('reportcards.*') ? 'active' : '' }}">
+        <a href="{{ $canManageReportCards ? route('reportcards.enter-marks') : route('reportcards.view') }}" class="nav-link {{ request()->routeIs('reportcards.*') ? 'active' : '' }}">
             <i class="bi bi-file-earmark-bar-graph-fill"></i> Report Cards
         </a>
         @endif
@@ -485,6 +492,8 @@
             <a href="{{ route('fees.categories') }}" class="nav-link {{ request()->routeIs('fees.*') ? 'active' : '' }}">
                 <i class="bi bi-cash-stack"></i> Fee Setup
             </a>
+        @endif
+        @if($canManageFeeGateway)
             <a href="{{ route('settings.payment-gateway') }}" class="nav-link {{ request()->routeIs('settings.payment-gateway') ? 'active' : '' }}">
                 <i class="bi bi-credit-card-2-front"></i> Payment Gateway
             </a>
@@ -495,6 +504,9 @@
             </a>
             <a href="{{ route('fees.payments') }}" class="nav-link {{ request()->routeIs('fees.payments*') ? 'active' : '' }}">
                 <i class="bi bi-receipt-cutoff"></i> Fee Payments
+            </a>
+            <a href="{{ route('fees.discounts') }}" class="nav-link {{ request()->routeIs('fees.discounts') ? 'active' : '' }}">
+                <i class="bi bi-percent"></i> Discount Records
             </a>
             <a href="{{ route('fees.due') }}" class="nav-link {{ request()->routeIs('fees.due') ? 'active' : '' }}">
                 <i class="bi bi-exclamation-circle"></i> Due Fees
@@ -697,7 +709,7 @@
                     <span>Notices</span>
                 </a>
             @elseif($canViewReportCards)
-                <a href="{{ $canManageReportCards ? route('reportcards.exams') : route('reportcards.view') }}" class="bottom-nav-item {{ request()->routeIs('reportcards.*') ? 'active' : '' }}">
+                <a href="{{ $canManageReportCards ? route('reportcards.enter-marks') : route('reportcards.view') }}" class="bottom-nav-item {{ request()->routeIs('reportcards.*') ? 'active' : '' }}">
                     <i class="bi {{ request()->routeIs('reportcards.*') ? 'bi-file-earmark-bar-graph-fill' : 'bi-file-earmark-bar-graph' }}"></i>
                     <span>Reports</span>
                 </a>
@@ -724,6 +736,11 @@
             <i class="bi bi-people-fill"></i> Students
         </a>
         @endif
+        @if($canManageStudentWithdrawals)
+        <a href="{{ route('students.withdrawals.index') }}" class="more-menu-item {{ request()->routeIs('students.withdrawals.*') ? 'active' : '' }}">
+            <i class="bi bi-box-arrow-right"></i> Withdrawals
+        </a>
+        @endif
         @if($canManageAttendance)
         <a href="{{ route('attendance.index') }}" class="more-menu-item {{ request()->routeIs('attendance.*') ? 'active' : '' }}">
             <i class="bi bi-calendar-check-fill"></i> Attendance
@@ -735,7 +752,7 @@
         </a>
         @endif
         @if($canViewReportCards)
-        <a href="{{ $canManageReportCards ? route('reportcards.exams') : route('reportcards.view') }}" class="more-menu-item {{ request()->routeIs('reportcards.*') ? 'active' : '' }}">
+        <a href="{{ $canManageReportCards ? route('reportcards.enter-marks') : route('reportcards.view') }}" class="more-menu-item {{ request()->routeIs('reportcards.*') ? 'active' : '' }}">
             <i class="bi bi-file-earmark-bar-graph-fill"></i> Report Cards
         </a>
         @endif
@@ -746,6 +763,8 @@
         <a href="{{ route('fees.categories') }}" class="more-menu-item {{ request()->routeIs('fees.categories','fees.structures') ? 'active' : '' }}">
             <i class="bi bi-cash-stack"></i> Fee Setup
         </a>
+        @endif
+        @if($canManageFeeGateway)
         <a href="{{ route('settings.payment-gateway') }}" class="more-menu-item {{ request()->routeIs('settings.payment-gateway') ? 'active' : '' }}">
             <i class="bi bi-credit-card-2-front"></i> Payment Gateway
         </a>
@@ -756,6 +775,9 @@
         </a>
         <a href="{{ route('fees.payments') }}" class="more-menu-item {{ request()->routeIs('fees.payments*') ? 'active' : '' }}">
             <i class="bi bi-receipt-cutoff"></i> Fee Payments
+        </a>
+        <a href="{{ route('fees.discounts') }}" class="more-menu-item {{ request()->routeIs('fees.discounts') ? 'active' : '' }}">
+            <i class="bi bi-percent"></i> Discount Records
         </a>
         <a href="{{ route('fees.due') }}" class="more-menu-item {{ request()->routeIs('fees.due') ? 'active' : '' }}">
             <i class="bi bi-exclamation-circle"></i> Due Fees

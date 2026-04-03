@@ -29,6 +29,13 @@
                             @endforeach
                         </select>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">Marksheet Template <span class="text-danger">*</span></label>
+                        <select name="report_template" class="form-select" required>
+                            <option value="semester_1">1st Semester / Half Yearly</option>
+                            <option value="semester_2">Final / 2nd Semester</option>
+                        </select>
+                    </div>
                     <div class="row g-2 mb-3">
                         <div class="col-6">
                             <label class="form-label">Start Date</label>
@@ -49,11 +56,12 @@
             <div class="card-header bg-white"><h6 class="mb-0 fw-semibold">All Exams</h6></div>
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
-                    <thead class="table-light"><tr><th>Name</th><th>Academic Year</th><th>Start</th><th>End</th><th></th></tr></thead>
+                    <thead class="table-light"><tr><th>Name</th><th>Template</th><th>Academic Year</th><th>Start</th><th>End</th><th></th></tr></thead>
                     <tbody>
                         @forelse($exams as $exam)
                         <tr>
                             <td class="fw-semibold">{{ $exam->name }}</td>
+                            <td>{{ $exam->resolved_template === 'semester_2' ? 'Final / 2nd Semester' : '1st Semester' }}</td>
                             <td>{{ $exam->academicYear->name }}</td>
                             <td>{{ $exam->start_date?->format('M d, Y') ?? '-' }}</td>
                             <td>{{ $exam->end_date?->format('M d, Y') ?? '-' }}</td>
@@ -65,7 +73,7 @@
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="5" class="text-center text-muted py-3">No exams</td></tr>
+                        <tr><td colspan="6" class="text-center text-muted py-3">No exams</td></tr>
                         @endforelse
                     </tbody>
                 </table>

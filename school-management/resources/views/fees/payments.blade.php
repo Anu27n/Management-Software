@@ -14,6 +14,7 @@
         @endif
     </div>
     <div class="d-flex gap-2">
+        <a href="{{ route('fees.discounts') }}" class="btn btn-outline-info btn-sm"><i class="bi bi-percent me-1"></i>Discount Records</a>
         <a href="{{ route('fees.due') }}" class="btn btn-outline-warning btn-sm"><i class="bi bi-exclamation-circle me-1"></i>Due Fees</a>
         <div class="btn-group btn-group-sm">
             <a href="{{ route('export.payments.csv', request()->query()) }}" class="btn btn-outline-success"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
@@ -34,16 +35,24 @@
                 <label class="form-label small">Status</label>
                 <select name="status" class="form-select form-select-sm">
                     <option value="">All</option>
-                    <option value="paid" {{ request('status') == 'paid' ? 'selected' : '' }}>Paid</option>
-                    <option value="partial" {{ request('status') == 'partial' ? 'selected' : '' }}>Partial</option>
+                    <option value="paid" {{ request('status') == 'paid' ? 'selected' : '' }}>Fully Paid</option>
+                    <option value="partial" {{ request('status') == 'partial' ? 'selected' : '' }}>Partially Paid</option>
                     <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Pending</option>
                 </select>
             </div>
             <div class="col-6 col-md-3">
+                <label class="form-label small">Payment Location</label>
+                <select name="payment_location" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    <option value="school" {{ request('payment_location') == 'school' ? 'selected' : '' }}>School</option>
+                    <option value="bank" {{ request('payment_location') == 'bank' ? 'selected' : '' }}>Bank</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
                 <label class="form-label small">From Date</label>
                 <input type="date" name="date_from" class="form-control form-control-sm" value="{{ request('date_from') }}">
             </div>
-            <div class="col-6 col-md-3">
+            <div class="col-6 col-md-2">
                 <label class="form-label small">To Date</label>
                 <input type="date" name="date_to" class="form-control form-control-sm" value="{{ request('date_to') }}">
             </div>
@@ -57,7 +66,7 @@
 <div class="card table-card">
     <div class="table-responsive">
         <table class="table table-hover mb-0">
-            <thead class="table-light"><tr><th>Receipt</th><th>Student</th><th>Category</th><th>Amount</th><th>Method</th><th>Date</th><th>Status</th><th></th></tr></thead>
+            <thead class="table-light"><tr><th>Receipt</th><th>Student</th><th>Category</th><th>Amount</th><th>Location</th><th>Mode</th><th>Date</th><th>Status</th><th></th></tr></thead>
             <tbody>
                 @forelse($payments as $p)
                 <tr>
@@ -65,13 +74,14 @@
                     <td>{{ $p->student->full_name }}</td>
                     <td>{{ $p->feeStructure->feeCategory->name ?? '-' }}</td>
                     <td>₹{{ number_format($p->amount_paid) }}</td>
-                    <td>{{ ucfirst(str_replace('_', ' ', $p->payment_method)) }}</td>
+                    <td>{{ ucfirst($p->payment_location ?: 'school') }}</td>
+                    <td>{{ ucfirst(str_replace('_', ' ', $p->payment_channel ?: $p->payment_method)) }}</td>
                     <td>{{ $p->payment_date->format('M d, Y') }}</td>
-                    <td><span class="badge bg-{{ $p->status == 'paid' ? 'success' : ($p->status == 'partial' ? 'warning' : 'danger') }}">{{ ucfirst($p->status) }}</span></td>
+                    <td><span class="badge bg-{{ $p->status == 'paid' ? 'success' : ($p->status == 'partial' ? 'warning' : 'danger') }}">{{ $p->status == 'paid' ? 'Fully Paid' : ($p->status == 'partial' ? 'Partially Paid' : 'Pending') }}</span></td>
                     <td><a href="{{ route('fees.payments.show', $p) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-eye"></i></a></td>
                 </tr>
                 @empty
-                <tr><td colspan="8" class="text-center text-muted py-3">No payments</td></tr>
+                <tr><td colspan="9" class="text-center text-muted py-3">No payments</td></tr>
                 @endforelse
             </tbody>
         </table>

@@ -86,25 +86,36 @@
                     <input type="number" name="fine" class="form-control" step="0.01" value="{{ old('fine', 0) }}">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Payment Method <span class="text-danger">*</span></label>
-                    <select id="payment_method" name="payment_method" class="form-select" required>
-                        <option value="cash" {{ old('payment_method') === 'cash' ? 'selected' : '' }}>Cash</option>
-                        <option value="online" {{ old('payment_method') === 'online' ? 'selected' : '' }}>Online</option>
-                        <option value="cheque" {{ old('payment_method') === 'cheque' ? 'selected' : '' }}>Cheque</option>
-                        <option value="bank_transfer" {{ old('payment_method') === 'bank_transfer' ? 'selected' : '' }}>Bank Transfer</option>
+                    <label class="form-label">Payment Location <span class="text-danger">*</span></label>
+                    <select id="payment_location" name="payment_location" class="form-select" required>
+                        <option value="school" {{ old('payment_location', 'school') === 'school' ? 'selected' : '' }}>School</option>
+                        <option value="bank" {{ old('payment_location') === 'bank' ? 'selected' : '' }}>Bank</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Payment Mode <span class="text-danger">*</span></label>
+                    <select id="payment_channel" name="payment_channel" class="form-select" required>
+                        <option value="">Select</option>
                     </select>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Status <span class="text-danger">*</span></label>
                     <select id="status" name="status" class="form-select" required>
-                        <option value="paid" {{ old('status') === 'paid' ? 'selected' : '' }}>Paid</option>
-                        <option value="partial" {{ old('status') === 'partial' ? 'selected' : '' }}>Partial</option>
-                        <option value="pending" {{ old('status') === 'pending' ? 'selected' : '' }}>Pending</option>
+                        <option value="paid" {{ old('status') === 'paid' ? 'selected' : '' }}>Fully Paid</option>
+                        <option value="partial" {{ old('status') === 'partial' ? 'selected' : '' }}>Partially Paid</option>
                     </select>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Transaction ID</label>
                     <input id="transaction_id" type="text" name="transaction_id" class="form-control" value="{{ old('transaction_id') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">UTR Number</label>
+                    <input type="text" name="utr_number" class="form-control" value="{{ old('utr_number') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Cheque Number</label>
+                    <input type="text" name="cheque_number" class="form-control" value="{{ old('cheque_number') }}">
                 </div>
 
                 <div id="onlineGatewayNotice" class="col-12 d-none">
@@ -160,7 +171,8 @@
             return;
         }
 
-        const paymentMethodEl = document.getElementById('payment_method');
+        const paymentLocationEl = document.getElementById('payment_location');
+        const paymentChannelEl = document.getElementById('payment_channel');
         const amountEl = document.getElementById('amount_paid');
         const transactionEl = document.getElementById('transaction_id');
         const statusEl = document.getElementById('status');
@@ -183,6 +195,19 @@
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
         const students = @json($studentPayload);
         const selectedFeeStructureId = "{{ old('fee_structure_id') }}";
+        const locationModeMap = {
+            school: [
+                { value: 'cash', label: 'Cash' },
+                { value: 'upi', label: 'UPI' },
+                { value: 'bank_transfer', label: 'Bank Transfer' },
+                { value: 'cheque', label: 'Cheque' },
+            ],
+            bank: [
+                { value: 'cheque', label: 'Cheque' },
+                { value: 'cash', label: 'Cash' },
+                { value: 'bank_transfer', label: 'Bank Transfer' },
+            ],
+        };
 
         function resetRazorpayPayload() {
             orderIdEl.value = '';
@@ -267,8 +292,19 @@
             studentResultsEl.classList.remove('d-none');
         }
 
+        function renderPaymentModes() {
+            const selectedValue = paymentChannelEl.value || "{{ old('payment_channel', 'cash') }}";
+            const options = locationModeMap[paymentLocationEl.value] || [];
+
+            paymentChannelEl.innerHTML = '<option value="">Select</option>';
+            options.forEach(function (option) {
+                const selected = option.value === selectedValue ? 'selected' : '';
+                paymentChannelEl.innerHTML += `<option value="${option.value}" ${selected}>${option.label}</option>`;
+            });
+        }
+
         function toggleOnlineMode() {
-            const isOnline = paymentMethodEl.value === 'online';
+            const isOnline = paymentChannelEl.value === 'upi';
 
             onlineGatewayNoticeEl.classList.toggle('d-none', !(isOnline && !razorpayReady));
             razorpaySectionEl.classList.toggle('d-none', !(isOnline && razorpayReady));
@@ -428,7 +464,7 @@
                 return;
             }
 
-            const isOnline = paymentMethodEl.value === 'online';
+            const isOnline = paymentChannelEl.value === 'upi';
             if (!isOnline || !razorpayReady) {
                 return;
             }
@@ -439,7 +475,12 @@
             }
         });
 
-        paymentMethodEl.addEventListener('change', toggleOnlineMode);
+        paymentLocationEl.addEventListener('change', function () {
+            renderPaymentModes();
+            toggleOnlineMode();
+        });
+        paymentChannelEl.addEventListener('change', toggleOnlineMode);
+        renderPaymentModes();
         toggleOnlineMode();
 
         if (studentIdEl.value) {

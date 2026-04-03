@@ -15,6 +15,7 @@ use App\Http\Controllers\ExportController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\QuickSearchController;
+use App\Http\Controllers\StudentWithdrawalController;
 
 // Auth routes
 Route::get('/', [AuthController::class, 'showLogin'])->name('login');
@@ -75,6 +76,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/students/bulk-upload', [StudentController::class, 'bulkUploadStore'])->name('students.bulk-upload.store');
         Route::get('/students/bulk-template', [StudentController::class, 'downloadBulkTemplate'])->name('students.bulk-upload.template');
 
+        Route::get('/students/withdrawals', [StudentWithdrawalController::class, 'index'])->name('students.withdrawals.index');
+        Route::post('/students/withdrawals', [StudentWithdrawalController::class, 'store'])->name('students.withdrawals.store');
+
         // Students
         Route::resource('students', StudentController::class);
         Route::get('/api/students', [StudentController::class, 'apiIndex'])->name('api.students.index');
@@ -116,7 +120,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/leaves/{leaf}/reject', [LeaveController::class, 'reject'])->name('leaves.reject');
     });
 
-    Route::middleware('permission:fees.manage')->group(function () {
+    Route::middleware('permission:fees.manage,fees.setup.manage')->group(function () {
         // Fees
         Route::get('/fees/categories', [FeeController::class, 'categories'])->name('fees.categories');
         Route::post('/fees/categories', [FeeController::class, 'storeCategory'])->name('fees.categories.store');
@@ -126,8 +130,9 @@ Route::middleware('auth')->group(function () {
         Route::delete('/fees/structures/{structure}', [FeeController::class, 'destroyStructure'])->name('fees.structures.destroy');
     });
 
-    Route::middleware('permission:fees.payments.manage')->group(function () {
+    Route::middleware('permission:fees.payments.manage,fees.quick-entry.manage')->group(function () {
         Route::get('/fees/payments', [FeeController::class, 'payments'])->name('fees.payments');
+        Route::get('/fees/discounts', [FeeController::class, 'discounts'])->name('fees.discounts');
         Route::get('/fees/due', [FeeController::class, 'dueFees'])->name('fees.due');
         Route::get('/fees/payments/create', [FeeController::class, 'createPayment'])->name('fees.payments.create');
         Route::post('/fees/payments', [FeeController::class, 'storePayment'])->name('fees.payments.store');
@@ -182,7 +187,7 @@ Route::middleware('auth')->group(function () {
             });
 
             // Payment gateway settings for fee collection
-            Route::middleware('permission:fees.manage')->group(function () {
+            Route::middleware('permission:fees.manage,fees.gateway.manage')->group(function () {
             Route::get('/payment-gateway', [SettingsController::class, 'paymentGateway'])->name('settings.payment-gateway');
             Route::post('/payment-gateway', [SettingsController::class, 'updatePaymentGateway'])->name('settings.payment-gateway.update');
             });

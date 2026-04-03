@@ -17,6 +17,11 @@ class StoreComprehensiveStudentRequest extends FormRequest
 
     public function rules(): array
     {
+        $qualificationOptions = ['illiterate', 'school', 'diploma', 'graduate', 'postgraduate', 'doctorate', 'other'];
+        $mediumOptions = ['Hindi', 'English'];
+        $fatherOccupationOptions = ['Private Job', 'Government Job', 'Business', 'Professional', 'Unemployed'];
+        $motherOccupationOptions = ['Private Job', 'Government Job', 'Business', 'Professional', 'Housewife'];
+
         return [
             'student_s_no' => ['required', 'string', 'max:50', 'unique:students,admission_no'],
             'student_surname' => ['nullable', 'string', 'max:100'],
@@ -28,6 +33,7 @@ class StoreComprehensiveStudentRequest extends FormRequest
             'aadhaar_number' => ['nullable', 'regex:/^[0-9]{12}$/'],
             'student_pen_number' => ['nullable', 'string', 'max:100'],
             'category' => ['required', Rule::in(['GEN', 'SC', 'ST', 'OBC'])],
+            'bpl_beneficiary' => ['nullable', Rule::in(['yes', 'no', 'na'])],
 
             'class_id' => ['required', 'exists:classes,id'],
             'section_id' => ['required', 'exists:sections,id'],
@@ -35,31 +41,31 @@ class StoreComprehensiveStudentRequest extends FormRequest
             'admission_date' => ['required', 'date'],
 
             'residential_address' => ['required', 'string', 'max:1000'],
-            'father_mobile_number' => ['required', 'regex:/^[0-9]{10}$/'],
-            'mother_mobile_number' => ['required', 'regex:/^[0-9]{10}$/'],
+            'father_mobile_number' => ['nullable', 'regex:/^[0-9]{10}$/'],
+            'mother_mobile_number' => ['nullable', 'regex:/^[0-9]{10}$/'],
 
             'last_school_name' => ['nullable', 'string', 'max:255'],
             'last_class' => ['nullable', 'string', 'max:100'],
             'report_card_attached' => ['required', 'boolean'],
             'transfer_certificate_attached' => ['required', 'boolean'],
 
-            'is_child_healthy' => ['required', Rule::in(['yes', 'no'])],
-            'health_report_attached' => ['required', 'boolean'],
+            'is_child_healthy' => ['nullable', Rule::in(['yes', 'no'])],
+            'health_report_attached' => ['nullable', 'boolean'],
 
-            'father_name' => ['required', 'string', 'max:255'],
-            'father_education' => ['nullable', 'string', 'max:255'],
-            'father_medium_of_instruction' => ['nullable', 'string', 'max:255'],
-            'father_occupation' => ['nullable', 'string', 'max:255'],
+            'father_name' => ['nullable', 'string', 'max:255'],
+            'father_education' => ['nullable', Rule::in($qualificationOptions)],
+            'father_medium_of_instruction' => ['nullable', Rule::in($mediumOptions)],
+            'father_occupation' => ['nullable', Rule::in($fatherOccupationOptions)],
             'father_business_designation' => ['nullable', 'string', 'max:255'],
             'father_organization_name' => ['nullable', 'string', 'max:255'],
             'father_office_address' => ['nullable', 'string', 'max:500'],
             'father_phone' => ['nullable', 'regex:/^[0-9]{10}$/'],
             'father_email' => ['nullable', 'email', 'max:255'],
 
-            'mother_name' => ['required', 'string', 'max:255'],
-            'mother_education' => ['nullable', 'string', 'max:255'],
-            'mother_medium_of_instruction' => ['nullable', 'string', 'max:255'],
-            'mother_occupation' => ['nullable', 'string', 'max:255'],
+            'mother_name' => ['nullable', 'string', 'max:255'],
+            'mother_education' => ['nullable', Rule::in($qualificationOptions)],
+            'mother_medium_of_instruction' => ['nullable', Rule::in($mediumOptions)],
+            'mother_occupation' => ['nullable', Rule::in($motherOccupationOptions)],
             'mother_business_designation' => ['nullable', 'string', 'max:255'],
             'mother_organization_name' => ['nullable', 'string', 'max:255'],
             'mother_office_address' => ['nullable', 'string', 'max:500'],
@@ -71,20 +77,28 @@ class StoreComprehensiveStudentRequest extends FormRequest
             'height_cm' => ['nullable', 'numeric', 'min:0', 'max:300'],
             'weight_kg' => ['nullable', 'numeric', 'min:0', 'max:300'],
 
-            'transport_mode' => ['required', Rule::in(['parents', 'van/auto/rickshaw', 'self'])],
+            'transport_mode' => ['nullable', Rule::in(['parents', 'van/auto/rickshaw', 'self'])],
 
+            'has_guardian' => ['nullable', 'boolean'],
             'guardian_name' => ['nullable', 'string', 'max:255'],
             'phone_number' => ['nullable', 'regex:/^[0-9]{10}$/'],
             'office_address' => ['nullable', 'string', 'max:500'],
+            'guardian_relation' => ['nullable', 'string', 'max:100'],
             'father_mobile' => ['nullable', 'regex:/^[0-9]{10}$/'],
             'mother_mobile' => ['nullable', 'regex:/^[0-9]{10}$/'],
 
+            'has_siblings' => ['nullable', 'boolean'],
+            'sibling_count' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'sibling_details' => ['nullable', 'array'],
+            'sibling_details.*.name' => ['nullable', 'string', 'max:255'],
+            'sibling_details.*.is_studying' => ['nullable', 'boolean'],
+            'sibling_details.*.class_id' => ['nullable', 'exists:classes,id'],
+            'sibling_details.*.notes' => ['nullable', 'string', 'max:255'],
             'sibling_1_name' => ['nullable', 'string', 'max:255'],
             'sibling_1_class' => ['nullable', 'string', 'max:100'],
             'sibling_2_name' => ['nullable', 'string', 'max:255'],
             'sibling_2_class' => ['nullable', 'string', 'max:100'],
 
-            'bpl_beneficiary' => ['nullable', Rule::in(['yes', 'no', 'na'])],
             'rte' => ['nullable', Rule::in(['yes', 'no'])],
             'father_signature' => ['nullable', 'string', 'max:255'],
             'mother_signature' => ['nullable', 'string', 'max:255'],
@@ -126,6 +140,8 @@ class StoreComprehensiveStudentRequest extends FormRequest
             $className = SchoolClass::query()->whereKey($classId)->value('name');
             $isRteEligible = ClassEligibility::isRteEligible($className);
             $rte = $this->input('rte');
+            $hasGuardian = $this->boolean('has_guardian');
+            $hasSiblings = $this->boolean('has_siblings');
 
             if ($isRteEligible && blank($rte)) {
                 $validator->errors()->add('rte', 'The RTE field is required for classes up to 8th.');
@@ -133,6 +149,47 @@ class StoreComprehensiveStudentRequest extends FormRequest
 
             if (!$isRteEligible && filled($rte)) {
                 $validator->errors()->add('rte', 'The RTE field is only allowed for classes up to 8th.');
+            }
+
+            if ($hasGuardian) {
+                if (blank($this->input('guardian_name'))) {
+                    $validator->errors()->add('guardian_name', 'Guardian name is required when guardian is marked Yes.');
+                }
+
+                if (blank($this->input('phone_number'))) {
+                    $validator->errors()->add('phone_number', 'Guardian phone number is required when guardian is marked Yes.');
+                }
+
+                if (blank($this->input('office_address'))) {
+                    $validator->errors()->add('office_address', 'Guardian address is required when guardian is marked Yes.');
+                }
+
+                if (blank($this->input('guardian_relation'))) {
+                    $validator->errors()->add('guardian_relation', 'Guardian relation is required when guardian is marked Yes.');
+                }
+            }
+
+            if ($hasSiblings) {
+                $siblingCount = (int) $this->input('sibling_count', 0);
+                $siblings = collect($this->input('sibling_details', []))->filter(fn ($item) => is_array($item));
+
+                if ($siblingCount <= 0) {
+                    $validator->errors()->add('sibling_count', 'Enter the number of siblings when siblings is marked Yes.');
+                }
+
+                if ($siblings->count() < $siblingCount) {
+                    $validator->errors()->add('sibling_details', 'Enter all sibling details.');
+                }
+
+                $siblings->take($siblingCount)->each(function ($sibling, $index) use ($validator) {
+                    if (blank($sibling['name'] ?? null)) {
+                        $validator->errors()->add("sibling_details.$index.name", 'Sibling name is required.');
+                    }
+
+                    if (!empty($sibling['is_studying']) && blank($sibling['class_id'] ?? null)) {
+                        $validator->errors()->add("sibling_details.$index.class_id", 'Sibling class is required when studying is Yes.');
+                    }
+                });
             }
         });
     }

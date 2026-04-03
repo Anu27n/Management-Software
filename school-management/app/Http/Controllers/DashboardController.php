@@ -4,28 +4,27 @@ namespace App\Http\Controllers;
 
 use App\Models\AcademicYear;
 use App\Models\Attendance;
-use App\Models\FeePayment;
-use App\Models\FeeStructure;
+use App\Models\ExamResult;
 use App\Models\Homework;
 use App\Models\LeaveApplication;
 use App\Models\Notice;
+use App\Models\SchoolClass;
+use App\Models\Section;
 use App\Models\Student;
+use App\Models\StudentWithdrawal;
 use App\Models\TeacherAssignment;
 use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $academicYear = AcademicYear::current();
         $user = auth()->user();
-
-        if ($user->isCashier()) {
-            return view('dashboard', $this->cashierDashboardData($academicYear));
-        }
 
         if ($user->isParent()) {
             return view('dashboard', $this->familyDashboardData($user, $academicYear, 'parent'));
@@ -35,359 +34,315 @@ class DashboardController extends Controller
             return view('dashboard', $this->familyDashboardData($user, $academicYear, 'student'));
         }
 
-        if ($user->isTeacher()) {
-            return view('dashboard', $this->teacherDashboardData($user, $academicYear));
+        return view('dashboard', $this->academicDashboardData($user, $request, $academicYear));
+    }
+
+    private function academicDashboardData(User $user, Request $request, ?AcademicYear $currentAcademicYear): array
+    {
+        $selectedAcademicYearId = (int) ($request->input('academic_year_id') ?: $currentAcademicYear?->id);
+        $selectedClassId = $request->filled('class_id') ? (int) $request->input('class_id') : null;
+        $selectedSectionId = $request->filled('section_id') ? (int) $request->input('section_id') : null;
+        $dateFrom = $request->input('date_from', now()->startOfMonth()->toDateString());
+        $dateTo = $request->input('date_to', now()->toDateString());
+
+        $assignedClassIds = $user->isTeacher()
+            ? TeacherAssignment::query()->where('user_id', $user->id)->pluck('class_id')->filter()->unique()->values()
+            : collect();
+
+        $classesQuery = SchoolClass::query()->select(['id', 'name', 'numeric_name'])->orderBy('numeric_name')->orderBy('name');
+        if ($assignedClassIds->isNotEmpty()) {
+            $classesQuery->whereIn('id', $assignedClassIds);
+        }
+        $classes = $classesQuery->get();
+
+        $sectionsQuery = Section::query()->select(['id', 'class_id', 'name'])->orderBy('name');
+        if ($selectedClassId) {
+            $sectionsQuery->where('class_id', $selectedClassId);
+        } elseif ($classes->isNotEmpty()) {
+            $sectionsQuery->whereIn('class_id', $classes->pluck('id'));
+        }
+        $sections = $sectionsQuery->get();
+
+        $studentsBase = Student::query()
+            ->select([
+                'id', 'first_name', 'last_name', 'admission_no', 'gender', 'date_of_birth',
+                'class_id', 'section_id', 'academic_year_id', 'admission_date', 'status', 'created_at'
+            ])
+            ->with(['schoolClass:id,name', 'section:id,name']);
+
+        if ($selectedAcademicYearId) {
+            $studentsBase->where('academic_year_id', $selectedAcademicYearId);
+        }
+        if ($selectedClassId) {
+            $studentsBase->where('class_id', $selectedClassId);
+        }
+        if ($selectedSectionId) {
+            $studentsBase->where('section_id', $selectedSectionId);
+        }
+        if ($assignedClassIds->isNotEmpty()) {
+            $studentsBase->whereIn('class_id', $assignedClassIds);
         }
 
-        return view('dashboard', $this->adminDashboardData($academicYear));
-    }
+        $allFilteredStudents = (clone $studentsBase)->get();
+        $activeStudents = $allFilteredStudents->where('status', 'active')->values();
+        $studentIds = $allFilteredStudents->pluck('id');
 
-    private function adminDashboardData(?AcademicYear $academicYear): array
-    {
-        return Cache::remember(
-            $this->dashboardCacheKey('admin', [
-                'academic_year' => $academicYear?->id,
-                'date' => today()->toDateString(),
-            ]),
-            now()->addSeconds(60),
-            function () use ($academicYear) {
-                $activeUserCounts = User::query()
-                    ->selectRaw('role, COUNT(*) as total')
-                    ->where('is_active', true)
-                    ->whereIn('role', ['teacher', 'parent'])
-                    ->groupBy('role')
-                    ->pluck('total', 'role');
+        $withdrawalsBase = StudentWithdrawal::query()->with(['student:id,first_name,last_name,admission_no,class_id,section_id', 'student.schoolClass:id,name', 'student.section:id,name']);
+        if ($studentIds->isNotEmpty()) {
+            $withdrawalsBase->whereIn('student_id', $studentIds);
+        } else {
+            $withdrawalsBase->whereRaw('1 = 0');
+        }
 
-                $attendanceToday = Attendance::query()
-                    ->selectRaw("SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present_count, COUNT(*) as total_count")
-                    ->whereDate('date', today())
-                    ->first();
+        $attendanceBase = Attendance::query()
+            ->with(['student:id,first_name,last_name,admission_no', 'schoolClass:id,name', 'section:id,name'])
+            ->whereBetween('date', [$dateFrom, $dateTo]);
+        if ($selectedAcademicYearId) {
+            $attendanceBase->where('academic_year_id', $selectedAcademicYearId);
+        }
+        if ($selectedClassId) {
+            $attendanceBase->where('class_id', $selectedClassId);
+        }
+        if ($selectedSectionId) {
+            $attendanceBase->where('section_id', $selectedSectionId);
+        }
+        if ($assignedClassIds->isNotEmpty()) {
+            $attendanceBase->whereIn('class_id', $assignedClassIds);
+        }
 
+        $performanceBase = ExamResult::query()
+            ->select([
+                'exam_results.id',
+                'exam_results.student_id',
+                'exam_results.class_id',
+                'exam_results.total_marks',
+                'exam_results.calculated_total',
+                'exam_results.marks_obtained',
+            ])
+            ->join('exams', 'exams.id', '=', 'exam_results.exam_id')
+            ->join('students', 'students.id', '=', 'exam_results.student_id')
+            ->where('exam_results.subject_category', 'scholastic');
+
+        if ($selectedAcademicYearId) {
+            $performanceBase->where('exams.academic_year_id', $selectedAcademicYearId);
+        }
+        if ($selectedClassId) {
+            $performanceBase->where('students.class_id', $selectedClassId);
+        }
+        if ($selectedSectionId) {
+            $performanceBase->where('students.section_id', $selectedSectionId);
+        }
+        if ($assignedClassIds->isNotEmpty()) {
+            $performanceBase->whereIn('students.class_id', $assignedClassIds);
+        }
+
+        $todayAttendanceStats = (clone $attendanceBase)
+            ->whereDate('date', today())
+            ->selectRaw("SUM(CASE WHEN status IN ('present','late') THEN 1 ELSE 0 END) as present_count, COUNT(*) as total_count")
+            ->first();
+
+        $rangeAttendanceStats = (clone $attendanceBase)
+            ->selectRaw("SUM(CASE WHEN status IN ('present','late') THEN 1 ELSE 0 END) as present_count, COUNT(*) as total_count")
+            ->first();
+
+        $classAttendance = (clone $attendanceBase)
+            ->join('classes', 'classes.id', '=', 'attendances.class_id')
+            ->selectRaw("classes.name as class_name, SUM(CASE WHEN attendances.status IN ('present','late') THEN 1 ELSE 0 END) as present_count, COUNT(*) as total_count")
+            ->groupBy('classes.id', 'classes.name')
+            ->orderBy('classes.name')
+            ->get()
+            ->map(fn ($row) => [
+                'label' => $row->class_name,
+                'value' => (int) $row->total_count > 0 ? round(((int) $row->present_count / (int) $row->total_count) * 100, 2) : 0,
+            ]);
+
+        $monthlyAttendance = (clone $attendanceBase)
+            ->selectRaw($this->monthExpression('date') . " as month_key, SUM(CASE WHEN status IN ('present','late') THEN 1 ELSE 0 END) as present_count, COUNT(*) as total_count")
+            ->groupBy('month_key')
+            ->orderBy('month_key')
+            ->get()
+            ->map(fn ($row) => [
+                'label' => $row->month_key,
+                'value' => (int) $row->total_count > 0 ? round(((int) $row->present_count / (int) $row->total_count) * 100, 2) : 0,
+            ]);
+
+        $classPerformance = (clone $performanceBase)
+            ->join('classes', 'classes.id', '=', 'students.class_id')
+            ->selectRaw('classes.name as class_name, AVG(((COALESCE(exam_results.calculated_total, exam_results.marks_obtained) * 100.0) / NULLIF(exam_results.total_marks, 0))) as average_percentage')
+            ->groupBy('classes.id', 'classes.name')
+            ->orderBy('classes.name')
+            ->get();
+
+        $studentPerformance = (clone $performanceBase)
+            ->selectRaw('students.id as student_id, students.first_name, students.last_name, students.admission_no, AVG(((COALESCE(exam_results.calculated_total, exam_results.marks_obtained) * 100.0) / NULLIF(exam_results.total_marks, 0))) as average_percentage')
+            ->groupBy('students.id', 'students.first_name', 'students.last_name', 'students.admission_no')
+            ->get()
+            ->map(function ($row) {
                 return [
-                    'dashboardType' => 'admin',
-                    'totalStudents' => Student::query()->where('status', 'active')->count(),
-                    'totalTeachers' => (int) ($activeUserCounts['teacher'] ?? 0),
-                    'totalParents' => (int) ($activeUserCounts['parent'] ?? 0),
-                    'pendingFees' => FeePayment::query()->where('status', 'pending')->count(),
-                    'todayAttendance' => (int) ($attendanceToday->present_count ?? 0),
-                    'totalPresent' => (int) ($attendanceToday->total_count ?? 0),
-                    'recentNotices' => $this->publishedNotices()
-                        ->latest('publish_date')
-                        ->take(5)
-                        ->get(),
-                    'pendingLeaves' => LeaveApplication::query()->where('status', 'pending')->count(),
-                    'recentPayments' => FeePayment::query()
-                        ->select(['id', 'student_id', 'receipt_no', 'amount_paid', 'payment_date', 'status'])
-                        ->with('student:id,first_name,last_name')
-                        ->latest()
-                        ->take(5)
-                        ->get(),
-                    'academicYear' => $academicYear,
+                    'student_id' => $row->student_id,
+                    'name' => trim(($row->first_name ?? '') . ' ' . ($row->last_name ?? '')),
+                    'admission_no' => $row->admission_no,
+                    'average_percentage' => round((float) $row->average_percentage, 2),
                 ];
-            }
-        );
-    }
+            })
+            ->filter(fn ($row) => $row['average_percentage'] > 0)
+            ->values();
 
-    private function teacherDashboardData(User $user, ?AcademicYear $academicYear): array
-    {
-        return Cache::remember(
-            $this->dashboardCacheKey('teacher', [
-                'user' => $user->id,
-                'academic_year' => $academicYear?->id,
-                'date' => today()->toDateString(),
-            ]),
-            now()->addSeconds(60),
-            function () use ($user, $academicYear) {
-                $assignments = TeacherAssignment::query()
-                    ->select(['id', 'user_id', 'class_id', 'section_id', 'subject_id', 'academic_year_id', 'is_class_teacher'])
-                    ->with([
-                        'schoolClass:id,name',
-                        'section:id,name',
-                        'subject:id,name',
-                    ])
-                    ->where('user_id', $user->id)
-                    ->get();
+        $recentAdmissions = $allFilteredStudents
+            ->sortByDesc(fn ($student) => $student->admission_date ?? $student->created_at)
+            ->take(5)
+            ->values();
 
-                $classIds = $assignments->pluck('class_id')->filter()->unique()->values();
-                $attendanceTotals = null;
+        $recentWithdrawals = (clone $withdrawalsBase)
+            ->latest('withdrawal_date')
+            ->take(5)
+            ->get();
 
-                if ($classIds->isNotEmpty()) {
-                    $attendanceTotals = Attendance::query()
-                        ->selectRaw("SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present_count, COUNT(*) as total_count")
-                        ->whereIn('class_id', $classIds)
-                        ->whereDate('date', today())
-                        ->first();
+        $recentAttendanceUpdates = (clone $attendanceBase)
+            ->latest('updated_at')
+            ->take(5)
+            ->get();
+
+        $todayBirthdays = $activeStudents
+            ->filter(fn ($student) => $student->date_of_birth && $student->date_of_birth->format('m-d') === now()->format('m-d'))
+            ->take(8)
+            ->values();
+
+        $announcements = $this->visibleNoticesForUser($user, 5, $selectedClassId);
+
+        return [
+            'dashboardType' => 'academic',
+            'filters' => [
+                'academic_year_id' => $selectedAcademicYearId,
+                'class_id' => $selectedClassId,
+                'section_id' => $selectedSectionId,
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+            ],
+            'academicYears' => AcademicYear::orderByDesc('is_active')->orderByDesc('start_date')->get(['id', 'name', 'is_active']),
+            'classes' => $classes,
+            'sections' => $sections,
+            'totalStudents' => $allFilteredStudents->count(),
+            'activeStudents' => $activeStudents->count(),
+            'newAdmissions' => $allFilteredStudents->filter(function ($student) use ($dateFrom, $dateTo) {
+                if (!$student->admission_date) {
+                    return false;
                 }
-
-                return [
-                    'dashboardType' => 'teacher',
-                    'assignedClasses' => $assignments,
-                    'totalStudents' => $classIds->isEmpty()
-                        ? 0
-                        : Student::query()->whereIn('class_id', $classIds)->where('status', 'active')->count(),
-                    'todayAttendance' => (int) ($attendanceTotals->present_count ?? 0),
-                    'totalPresent' => (int) ($attendanceTotals->total_count ?? 0),
-                    'pendingLeaves' => $classIds->isEmpty()
-                        ? 0
-                        : LeaveApplication::query()->whereIn('class_id', $classIds)->where('status', 'pending')->count(),
-                    'recentHomework' => Homework::query()
-                        ->select(['id', 'title', 'class_id', 'section_id', 'assigned_by', 'created_at'])
-                        ->with(['schoolClass:id,name', 'section:id,name'])
-                        ->where('assigned_by', $user->id)
-                        ->latest()
-                        ->take(5)
-                        ->get(),
-                    'recentNotices' => $this->visibleNoticesForUser($user, 5),
-                    'academicYear' => $academicYear,
-                ];
-            }
-        );
-    }
-
-    private function cashierDashboardData(?AcademicYear $academicYear): array
-    {
-        return Cache::remember(
-            $this->dashboardCacheKey('cashier', [
-                'academic_year' => $academicYear?->id,
-                'date' => today()->toDateString(),
-            ]),
-            now()->addSeconds(60),
-            function () use ($academicYear) {
-                return [
-                    'dashboardType' => 'cashier',
-                    'paymentsTodayCount' => FeePayment::query()->whereDate('payment_date', today())->count(),
-                    'paymentsTodayAmount' => (float) FeePayment::query()->whereDate('payment_date', today())->sum('amount_paid'),
-                    'pendingFees' => FeePayment::query()->where('status', 'pending')->count(),
-                    'partialPayments' => FeePayment::query()->where('status', 'partial')->count(),
-                    'recentPayments' => FeePayment::query()
-                        ->select(['id', 'student_id', 'fee_structure_id', 'collected_by', 'receipt_no', 'amount_paid', 'payment_date', 'status'])
-                        ->with([
-                            'student:id,first_name,last_name',
-                            'feeStructure:id,fee_category_id',
-                            'feeStructure.feeCategory:id,name',
-                            'collector:id,name',
-                        ])
-                        ->latest()
-                        ->take(8)
-                        ->get(),
-                    'recentNotices' => $this->publishedNotices()
-                        ->whereIn('target_audience', ['all', 'teachers'])
-                        ->latest('publish_date')
-                        ->take(5)
-                        ->get(),
-                    'academicYear' => $academicYear,
-                ];
-            }
-        );
+                return $student->admission_date->between(Carbon::parse($dateFrom), Carbon::parse($dateTo));
+            })->count(),
+            'withdrawalsThisPeriod' => (clone $withdrawalsBase)
+                ->whereBetween('withdrawal_date', [$dateFrom, $dateTo])
+                ->count(),
+            'genderLabels' => ['Male', 'Female', 'Other'],
+            'genderValues' => [
+                $activeStudents->where('gender', 'male')->count(),
+                $activeStudents->where('gender', 'female')->count(),
+                $activeStudents->where('gender', 'other')->count(),
+            ],
+            'classDistributionLabels' => $activeStudents->groupBy(fn ($student) => $student->schoolClass?->name ?? 'Unassigned')->keys()->values(),
+            'classDistributionValues' => $activeStudents->groupBy(fn ($student) => $student->schoolClass?->name ?? 'Unassigned')->map->count()->values(),
+            'sectionStrength' => $activeStudents
+                ->groupBy(fn ($student) => trim(($student->schoolClass?->name ?? 'Unassigned') . ' - ' . ($student->section?->name ?? 'No Section')))
+                ->map(fn ($group, $label) => ['label' => $label, 'total' => $group->count()])
+                ->sortByDesc('total')
+                ->values(),
+            'todayAttendancePercentage' => (int) ($todayAttendanceStats->total_count ?? 0) > 0
+                ? round(((int) $todayAttendanceStats->present_count / (int) $todayAttendanceStats->total_count) * 100, 2)
+                : 0,
+            'rangeAttendancePercentage' => (int) ($rangeAttendanceStats->total_count ?? 0) > 0
+                ? round(((int) $rangeAttendanceStats->present_count / (int) $rangeAttendanceStats->total_count) * 100, 2)
+                : 0,
+            'classAttendanceLabels' => $classAttendance->pluck('label')->values(),
+            'classAttendanceValues' => $classAttendance->pluck('value')->values(),
+            'monthlyAttendanceLabels' => $monthlyAttendance->pluck('label')->values(),
+            'monthlyAttendanceValues' => $monthlyAttendance->pluck('value')->values(),
+            'classPerformanceLabels' => $classPerformance->pluck('class_name')->values(),
+            'classPerformanceValues' => $classPerformance->map(fn ($row) => round((float) $row->average_percentage, 2))->values(),
+            'topPerformers' => $studentPerformance->sortByDesc('average_percentage')->take(5)->values(),
+            'lowPerformers' => $studentPerformance->sortBy('average_percentage')->take(5)->values(),
+            'recentAdmissions' => $recentAdmissions,
+            'recentWithdrawals' => $recentWithdrawals,
+            'recentAttendanceUpdates' => $recentAttendanceUpdates,
+            'todayBirthdays' => $todayBirthdays,
+            'announcements' => $announcements,
+            'academicYear' => AcademicYear::find($selectedAcademicYearId),
+        ];
     }
 
     private function familyDashboardData(User $user, ?AcademicYear $academicYear, string $portal): array
     {
-        return Cache::remember(
-            $this->dashboardCacheKey($portal, [
-                'user' => $user->id,
-                'academic_year' => $academicYear?->id,
-                'date' => today()->toDateString(),
-            ]),
-            now()->addSeconds(60),
-            function () use ($user, $academicYear, $portal) {
-                $studentsQuery = Student::query()
-                    ->select([
-                        'id',
-                        'first_name',
-                        'last_name',
-                        'class_id',
-                        'section_id',
-                        'academic_year_id',
-                        'parent_user_id',
-                        'email',
-                        'status',
-                    ])
-                    ->with(['schoolClass:id,name', 'section:id,name']);
+        $studentsQuery = Student::query()
+            ->select([
+                'id', 'first_name', 'last_name', 'class_id', 'section_id', 'academic_year_id',
+                'parent_user_id', 'email', 'status'
+            ])
+            ->with(['schoolClass:id,name', 'section:id,name']);
 
-                if ($portal === 'parent') {
-                    $studentsQuery->where('parent_user_id', $user->id);
-                } else {
-                    $studentsQuery->where('email', $user->email);
-                }
-
-                $students = $studentsQuery
-                    ->where('status', 'active')
-                    ->get();
-
-                $studentIds = $students->pluck('id');
-                $feeOverview = $this->buildFeeOverviewForStudents($students);
-                $attendanceTotals = null;
-
-                if ($studentIds->isNotEmpty()) {
-                    $attendanceTotals = Attendance::query()
-                        ->selectRaw("SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present_count")
-                        ->whereIn('student_id', $studentIds)
-                        ->whereDate('date', today())
-                        ->first();
-                }
-
-                return [
-                    'dashboardType' => $portal,
-                    'students' => $students,
-                    'dueAmount' => $feeOverview['due_amount'],
-                    'dueItemsCount' => $feeOverview['items']->where('due_amount', '>', 0)->count(),
-                    'todayAttendance' => (int) ($attendanceTotals->present_count ?? 0),
-                    'totalPresent' => $students->count(),
-                    'recentNotices' => $this->visibleNoticesForUser($user, 5),
-                    'pendingLeaves' => $studentIds->isEmpty()
-                        ? 0
-                        : LeaveApplication::query()->whereIn('student_id', $studentIds)->where('status', 'pending')->count(),
-                    'recentPayments' => $studentIds->isEmpty()
-                        ? collect()
-                        : FeePayment::query()
-                            ->select(['id', 'student_id', 'fee_structure_id', 'amount_paid', 'payment_date', 'status'])
-                            ->with(['student:id,first_name,last_name', 'feeStructure:id,fee_category_id', 'feeStructure.feeCategory:id,name'])
-                            ->whereIn('student_id', $studentIds)
-                            ->latest()
-                            ->take(5)
-                            ->get(),
-                    'academicYear' => $academicYear,
-                ];
-            }
-        );
-    }
-
-    private function buildFeeOverviewForStudents(Collection $students): array
-    {
-        if ($students->isEmpty()) {
-            return [
-                'items' => collect(),
-                'due_amount' => 0,
-            ];
+        if ($portal === 'parent') {
+            $studentsQuery->where('parent_user_id', $user->id);
+        } else {
+            $studentsQuery->where('email', $user->email);
         }
 
-        $classYearPairs = $students
-            ->map(fn (Student $student) => [
-                'class_id' => $student->class_id,
-                'academic_year_id' => $student->academic_year_id,
-            ])
-            ->unique(fn (array $pair) => $pair['class_id'] . '-' . $pair['academic_year_id'])
-            ->values();
+        $students = $studentsQuery->where('status', 'active')->get();
+        $studentIds = $students->pluck('id');
 
-        $structures = FeeStructure::query()
-            ->select(['id', 'fee_category_id', 'class_id', 'academic_year_id', 'amount'])
-            ->with('feeCategory:id,name')
-            ->where(function ($query) use ($classYearPairs) {
-                foreach ($classYearPairs as $pair) {
-                    $query->orWhere(function ($pairQuery) use ($pair) {
-                        $pairQuery
-                            ->where('class_id', $pair['class_id'])
-                            ->where('academic_year_id', $pair['academic_year_id']);
-                    });
-                }
-            })
-            ->get()
-            ->groupBy(fn (FeeStructure $structure) => $structure->class_id . '-' . $structure->academic_year_id);
-
-        $paidAmounts = FeePayment::query()
-            ->select('student_id', 'fee_structure_id', DB::raw('SUM(amount_paid) as total_paid'))
-            ->whereIn('student_id', $students->pluck('id'))
-            ->groupBy('student_id', 'fee_structure_id')
-            ->get()
-            ->mapWithKeys(fn ($payment) => [$payment->student_id . '-' . $payment->fee_structure_id => (float) $payment->total_paid]);
-
-        $items = [];
-        $dueAmount = 0;
-
-        foreach ($students as $student) {
-            $studentStructures = $structures->get($student->class_id . '-' . $student->academic_year_id, collect());
-
-            foreach ($studentStructures as $structure) {
-                $paidAmount = (float) ($paidAmounts[$student->id . '-' . $structure->id] ?? 0);
-                $pendingAmount = max(0, (float) $structure->amount - $paidAmount);
-                $dueAmount += $pendingAmount;
-
-                $items[] = [
-                    'student' => $student,
-                    'structure' => $structure,
-                    'due_amount' => $pendingAmount,
-                ];
-            }
+        $attendanceTotals = null;
+        if ($studentIds->isNotEmpty()) {
+            $attendanceTotals = Attendance::query()
+                ->selectRaw("SUM(CASE WHEN status IN ('present','late') THEN 1 ELSE 0 END) as present_count")
+                ->whereIn('student_id', $studentIds)
+                ->whereDate('date', today())
+                ->first();
         }
 
         return [
-            'items' => collect($items),
-            'due_amount' => $dueAmount,
+            'dashboardType' => $portal,
+            'students' => $students,
+            'todayAttendance' => (int) ($attendanceTotals->present_count ?? 0),
+            'totalPresent' => $students->count(),
+            'recentNotices' => $this->visibleNoticesForUser($user, 5),
+            'pendingLeaves' => $studentIds->isEmpty()
+                ? 0
+                : LeaveApplication::query()->whereIn('student_id', $studentIds)->where('status', 'pending')->count(),
+            'recentHomework' => $studentIds->isEmpty()
+                ? collect()
+                : Homework::query()->latest()->take(5)->get(),
+            'academicYear' => $academicYear,
         ];
     }
 
-    private function publishedNotices()
+    private function visibleNoticesForUser(User $user, int $limit = 5, ?int $classId = null): Collection
     {
-        return Notice::query()
+        $query = Notice::query()
             ->select(['id', 'title', 'content', 'publish_date', 'expiry_date', 'target_audience', 'class_id'])
             ->where('is_published', true)
             ->whereDate('publish_date', '<=', now())
-            ->where(function ($query) {
-                $query->whereNull('expiry_date')->orWhereDate('expiry_date', '>=', now());
+            ->where(function ($builder) {
+                $builder->whereNull('expiry_date')->orWhereDate('expiry_date', '>=', now());
             });
+
+        if ($user->isParent()) {
+            $query->whereIn('target_audience', ['all', 'parents']);
+        } elseif ($user->isStudent()) {
+            $query->whereIn('target_audience', ['all', 'students']);
+        } else {
+            $query->whereIn('target_audience', ['all', 'teachers']);
+        }
+
+        if ($classId) {
+            $query->where(function ($builder) use ($classId) {
+                $builder->whereNull('class_id')->orWhere('class_id', $classId);
+            });
+        }
+
+        return $query->latest('publish_date')->take($limit)->get();
     }
 
-    private function visibleNoticesForUser(User $user, int $limit = 5): Collection
+    private function monthExpression(string $column): string
     {
-        return Cache::remember(
-            $this->dashboardCacheKey('notices', [
-                'user' => $user->id,
-                'limit' => $limit,
-                'date' => today()->toDateString(),
-            ]),
-            now()->addSeconds(60),
-            function () use ($user, $limit) {
-                $query = $this->publishedNotices();
-
-                if ($user->isParent()) {
-                    $classIds = Student::query()
-                        ->where('parent_user_id', $user->id)
-                        ->pluck('class_id')
-                        ->unique()
-                        ->filter();
-
-                    $query->where(function ($noticeQuery) {
-                        $noticeQuery->where('target_audience', 'all')->orWhere('target_audience', 'parents');
-                    });
-
-                    if ($classIds->isNotEmpty()) {
-                        $query->where(function ($noticeQuery) use ($classIds) {
-                            $noticeQuery->whereNull('class_id')->orWhereIn('class_id', $classIds);
-                        });
-                    }
-                } elseif ($user->isStudent()) {
-                    $classIds = Student::query()
-                        ->where('email', $user->email)
-                        ->pluck('class_id')
-                        ->unique()
-                        ->filter();
-
-                    $query->where(function ($noticeQuery) {
-                        $noticeQuery->where('target_audience', 'all')->orWhere('target_audience', 'students');
-                    });
-
-                    if ($classIds->isNotEmpty()) {
-                        $query->where(function ($noticeQuery) use ($classIds) {
-                            $noticeQuery->whereNull('class_id')->orWhereIn('class_id', $classIds);
-                        });
-                    }
-                } elseif ($user->isTeacher() || $user->isCashier()) {
-                    $query->whereIn('target_audience', ['all', 'teachers']);
-                }
-
-                return $query->latest('publish_date')->take($limit)->get();
-            }
-        );
-    }
-
-    private function dashboardCacheKey(string $scope, array $parts = []): string
-    {
-        $suffix = collect($parts)
-            ->filter(fn ($value) => $value !== null && $value !== '')
-            ->map(fn ($value, $key) => $key . ':' . $value)
-            ->implode('|');
-
-        return 'dashboard:' . $scope . ($suffix !== '' ? ':' . $suffix : '');
+        return DB::connection()->getDriverName() === 'sqlite'
+            ? "strftime('%Y-%m', {$column})"
+            : "DATE_FORMAT({$column}, '%Y-%m')";
     }
 }

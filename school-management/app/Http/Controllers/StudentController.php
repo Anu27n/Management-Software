@@ -441,7 +441,7 @@ class StudentController extends Controller
 
         DB::transaction(function () use (&$studentData, &$profileData, &$generatedCredentials, &$student) {
             [$parentUser, $generatedCredentials] = $this->resolveParentAccount($studentData);
-            $studentData['parent_user_id'] = $parentUser->id;
+            $studentData['parent_user_id'] = $parentUser?->id;
 
             $student = Student::create($studentData);
             $student->profile()->create($profileData);
@@ -449,10 +449,10 @@ class StudentController extends Controller
 
         $successMessage = $generatedCredentials
             ? 'Student added and parent login created successfully.'
-            : 'Student added successfully. Existing parent login was linked.';
+            : 'Student added successfully.';
 
         $redirect = redirect()
-            ->route('students.index')
+            ->route('students.create')
             ->with('success', $successMessage);
 
         if ($generatedCredentials) {
@@ -484,7 +484,7 @@ class StudentController extends Controller
 
         $student = DB::transaction(function () use (&$studentData, &$profileData, &$generatedCredentials) {
             [$parentUser, $generatedCredentials] = $this->resolveParentAccount($studentData);
-            $studentData['parent_user_id'] = $parentUser->id;
+            $studentData['parent_user_id'] = $parentUser?->id;
 
             $created = Student::create($studentData);
             $created->profile()->create($profileData);
@@ -609,6 +609,13 @@ class StudentController extends Controller
             trim((string) ($validated['student_middle_name'] ?? '')),
             trim((string) ($validated['student_surname'] ?? '')),
         ], fn ($value) => $value !== '')));
+        $primaryPhone = $validated['phone_number']
+            ?? $validated['father_mobile_number']
+            ?? $validated['mother_mobile_number']
+            ?? null;
+        $primaryEmail = $validated['father_email']
+            ?? $validated['mother_email']
+            ?? strtolower($validated['student_s_no'] . '@school.local');
 
         return [
             'admission_no' => $validated['student_s_no'],
@@ -620,14 +627,14 @@ class StudentController extends Controller
             'caste' => $validated['category'],
             'nationality' => $validated['nationality'],
             'address' => $validated['residential_address'],
-            'phone' => $validated['father_mobile_number'],
-            'email' => $validated['father_email'] ?? ($validated['mother_email'] ?? strtolower($validated['student_s_no'] . '@school.local')),
+            'phone' => filled($primaryPhone) ? $primaryPhone : null,
+            'email' => filled($primaryEmail) ? $primaryEmail : strtolower($validated['student_s_no'] . '@school.local'),
             'admission_date' => $validated['admission_date'],
             'previous_school' => $validated['last_school_name'] ?? null,
-            'father_name' => $validated['father_name'],
+            'father_name' => filled($validated['father_name'] ?? null) ? $validated['father_name'] : 'N/A',
             'father_phone' => $validated['father_phone'] ?? null,
             'father_occupation' => $validated['father_occupation'] ?? null,
-            'mother_name' => $validated['mother_name'],
+            'mother_name' => filled($validated['mother_name'] ?? null) ? $validated['mother_name'] : null,
             'mother_phone' => $validated['mother_phone'] ?? null,
             'mother_occupation' => $validated['mother_occupation'] ?? null,
             'guardian_name' => $validated['guardian_name'] ?? null,
@@ -644,6 +651,20 @@ class StudentController extends Controller
     {
         $className = SchoolClass::query()->whereKey($validated['class_id'])->value('name');
         $isRteEligible = ClassEligibility::isRteEligible($className);
+        $siblingDetails = collect($validated['sibling_details'] ?? [])
+            ->filter(fn ($item) => is_array($item) && filled($item['name'] ?? null))
+            ->map(function (array $item) {
+                return [
+                    'name' => trim((string) ($item['name'] ?? '')),
+                    'is_studying' => !empty($item['is_studying']),
+                    'class_id' => !empty($item['class_id']) ? (int) $item['class_id'] : null,
+                    'notes' => filled($item['notes'] ?? null) ? trim((string) $item['notes']) : null,
+                ];
+            })
+            ->values()
+            ->all();
+        $firstSibling = $siblingDetails[0] ?? null;
+        $secondSibling = $siblingDetails[1] ?? null;
 
         return [
             'student_s_no' => $validated['student_s_no'],
@@ -661,9 +682,9 @@ class StudentController extends Controller
             'last_class' => $validated['last_class'] ?? null,
             'report_card_attached' => (bool) $validated['report_card_attached'],
             'transfer_certificate_attached' => (bool) $validated['transfer_certificate_attached'],
-            'is_child_healthy' => $validated['is_child_healthy'],
-            'health_report_attached' => (bool) $validated['health_report_attached'],
-            'father_name' => $validated['father_name'],
+            'is_child_healthy' => $validated['is_child_healthy'] ?? 'yes',
+            'health_report_attached' => (bool) ($validated['health_report_attached'] ?? false),
+            'father_name' => filled($validated['father_name'] ?? null) ? $validated['father_name'] : null,
             'father_education' => $validated['father_education'] ?? null,
             'father_medium_of_instruction' => $validated['father_medium_of_instruction'] ?? null,
             'father_occupation' => $validated['father_occupation'] ?? null,
@@ -672,7 +693,7 @@ class StudentController extends Controller
             'father_office_address' => $validated['father_office_address'] ?? null,
             'father_phone' => $validated['father_phone'] ?? null,
             'father_email' => $validated['father_email'] ?? null,
-            'mother_name' => $validated['mother_name'],
+            'mother_name' => filled($validated['mother_name'] ?? null) ? $validated['mother_name'] : null,
             'mother_education' => $validated['mother_education'] ?? null,
             'mother_medium_of_instruction' => $validated['mother_medium_of_instruction'] ?? null,
             'mother_occupation' => $validated['mother_occupation'] ?? null,
@@ -685,16 +706,21 @@ class StudentController extends Controller
             'blood_group' => $validated['blood_group'] ?? null,
             'height_cm' => $validated['height_cm'] ?? null,
             'weight_kg' => $validated['weight_kg'] ?? null,
-            'transport_mode' => $validated['transport_mode'],
+            'transport_mode' => $validated['transport_mode'] ?? null,
+            'has_guardian' => (bool) ($validated['has_guardian'] ?? false),
             'guardian_name' => $validated['guardian_name'] ?? null,
+            'guardian_relation' => $validated['guardian_relation'] ?? null,
             'phone_number' => $validated['phone_number'] ?? null,
             'office_address' => $validated['office_address'] ?? null,
             'father_mobile' => $validated['father_mobile'] ?? null,
             'mother_mobile' => $validated['mother_mobile'] ?? null,
-            'sibling_1_name' => $validated['sibling_1_name'] ?? null,
-            'sibling_1_class' => $validated['sibling_1_class'] ?? null,
-            'sibling_2_name' => $validated['sibling_2_name'] ?? null,
-            'sibling_2_class' => $validated['sibling_2_class'] ?? null,
+            'has_siblings' => (bool) ($validated['has_siblings'] ?? false),
+            'sibling_count' => (int) ($validated['sibling_count'] ?? count($siblingDetails)),
+            'sibling_details' => $siblingDetails,
+            'sibling_1_name' => $firstSibling['name'] ?? null,
+            'sibling_1_class' => $firstSibling['class_id'] ?? null,
+            'sibling_2_name' => $secondSibling['name'] ?? null,
+            'sibling_2_class' => $secondSibling['class_id'] ?? null,
             'bpl_beneficiary' => $validated['bpl_beneficiary'] ?? 'na',
             'rte' => $isRteEligible ? ($validated['rte'] ?? null) : null,
             'father_signature' => $validated['father_signature'] ?? null,
@@ -715,10 +741,14 @@ class StudentController extends Controller
 
     private function resolveParentAccount(array $validated, ?Student $student = null): array
     {
-        $email = strtolower(trim((string) $validated['email']));
-        $phone = trim((string) $validated['phone']);
+        $email = strtolower(trim((string) ($validated['email'] ?? '')));
+        $phone = trim((string) ($validated['phone'] ?? ''));
         $linkedParent = $student?->parentUser;
         $hasUsernameColumn = Schema::hasColumn('users', 'username');
+
+        if ($email === '') {
+            return [null, null];
+        }
 
         $existingUser = User::query()
             ->whereRaw('LOWER(email) = ?', [$email])
@@ -766,7 +796,7 @@ class StudentController extends Controller
         $parentUserData = [
             'name' => $this->buildParentAccountName($validated),
             'email' => $email,
-            'phone' => $phone,
+            'phone' => $phone !== '' ? $phone : null,
             'role' => 'parent',
             'password' => $plainPassword,
             'is_active' => true,
@@ -803,7 +833,7 @@ class StudentController extends Controller
             return $name;
         }
 
-        return trim(($validated['first_name'] ?? 'Student') . ' ' . ($validated['last_name'] ?? 'Parent')) . ' Parent';
+        return trim(($validated['student_first_name'] ?? 'Student') . ' ' . ($validated['student_surname'] ?? 'Parent')) . ' Parent';
     }
 
     private function sendAdmissionCredentials(User $parentUser, array $validated, string $plainPassword): void

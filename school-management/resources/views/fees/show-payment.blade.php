@@ -14,9 +14,16 @@
             <div class="col-md-6">
                 <p><strong>Receipt No:</strong> {{ $payment->receipt_no }}</p>
                 <p><strong>Date:</strong> {{ $payment->payment_date->format('M d, Y') }}</p>
-                <p><strong>Payment Method:</strong> {{ ucfirst(str_replace('_', ' ', $payment->payment_method)) }}</p>
+                <p><strong>Payment Location:</strong> {{ ucfirst($payment->payment_location ?: 'school') }}</p>
+                <p><strong>Payment Mode:</strong> {{ ucfirst(str_replace('_', ' ', $payment->payment_channel ?: $payment->payment_method)) }}</p>
                 @if($payment->transaction_id)
                 <p><strong>Transaction ID:</strong> {{ $payment->transaction_id }}</p>
+                @endif
+                @if($payment->utr_number)
+                <p><strong>UTR Number:</strong> {{ $payment->utr_number }}</p>
+                @endif
+                @if($payment->cheque_number)
+                <p><strong>Cheque Number:</strong> {{ $payment->cheque_number }}</p>
                 @endif
             </div>
             <div class="col-md-6">
@@ -31,7 +38,7 @@
             <tr><td>Fine</td><td class="text-end text-danger">+ ₹{{ number_format($payment->fine, 2) }}</td></tr>
             <tr class="table-primary"><td class="fw-bold">Amount Paid</td><td class="text-end fw-bold">₹{{ number_format($payment->amount_paid, 2) }}</td></tr>
         </table>
-        <p><strong>Status:</strong> <span class="badge bg-{{ $payment->status == 'paid' ? 'success' : 'warning' }}">{{ ucfirst($payment->status) }}</span></p>
+        <p><strong>Status:</strong> <span class="badge bg-{{ $payment->status == 'paid' ? 'success' : 'warning' }}">{{ $payment->status == 'paid' ? 'Fully Paid' : ($payment->status == 'partial' ? 'Partially Paid' : ucfirst($payment->status)) }}</span></p>
         @if($payment->remarks)
         <p><strong>Remarks:</strong> {{ $payment->remarks }}</p>
         @endif
