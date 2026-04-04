@@ -9,8 +9,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" href="/icons/icon-192.png">
-    <title>@yield('title', 'School Management System')</title>
+    <link rel="apple-touch-icon" href="{{ $siteSettings->logo_url ?? '/icons/icon-192.png' }}">
+    <link rel="icon" type="image/png" href="{{ $siteSettings->favicon_url ?? '/favicon.ico' }}">
+    <title>@yield('title', $siteSettings->school_name ?: 'School Management System')</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
@@ -449,7 +450,7 @@
     <nav class="sidebar" id="sidebar">
         <div class="brand">
             <i class="bi bi-mortarboard-fill"></i>
-            <span>SchoolMS</span>
+            <span>{{ $siteSettings->school_name ?: 'SchoolMS' }}</span>
         </div>
 
         <div class="nav-section">Main</div>
@@ -534,6 +535,9 @@
         @if($showSettingsSection)
         <div class="nav-section">Settings</div>
         @if($canManageSettings)
+        <a href="{{ route('settings.site') }}" class="nav-link {{ request()->routeIs('settings.site') ? 'active' : '' }}">
+            <i class="bi bi-globe-central-south-asia"></i> Site Settings
+        </a>
         <a href="{{ route('settings.classes') }}" class="nav-link {{ request()->routeIs('settings.classes') ? 'active' : '' }}">
             <i class="bi bi-building"></i> Classes
         </a>
@@ -806,6 +810,9 @@
         <div class="more-menu-divider"></div>
         <div class="more-menu-section">Settings</div>
         @if($canManageSettings)
+        <a href="{{ route('settings.site') }}" class="more-menu-item {{ request()->routeIs('settings.site') ? 'active' : '' }}">
+            <i class="bi bi-globe-central-south-asia"></i> Site Settings
+        </a>
         <a href="{{ route('settings.classes') }}" class="more-menu-item {{ request()->routeIs('settings.classes') ? 'active' : '' }}">
             <i class="bi bi-building"></i> Classes
         </a>

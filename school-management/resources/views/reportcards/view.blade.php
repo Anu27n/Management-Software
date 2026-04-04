@@ -46,9 +46,6 @@
     <div class="card-body reportcard-print-area">
         @include('reportcards.partials.marksheet', ['marksheet' => $marksheet, 'forPdf' => false])
     </div>
-    <div class="card-footer bg-white text-end d-print-none">
-        <button onclick="window.print()" class="btn btn-outline-secondary"><i class="bi bi-printer me-1"></i>Print</button>
-    </div>
 </div>
 @endif
 @endsection
@@ -56,10 +53,43 @@
 @push('styles')
 <style>
     .marksheet-shell { max-width: 100%; }
+    .marksheet-header {
+        border: 2px solid #7a4a00;
+        background: #fff;
+        padding: 0.75rem 0.75rem 0.5rem;
+    }
+    .marksheet-header-top {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        padding-bottom: 0.35rem;
+    }
+    .marksheet-logo {
+        max-height: 52px;
+        width: auto;
+        display: block;
+        mix-blend-mode: multiply;
+    }
+    .marksheet-title-bar {
+        background: #b8860b;
+        color: #fff;
+        padding: 0.25rem 0;
+        letter-spacing: 0.03em;
+    }
     .marksheet-meta td:first-child { width: 140px; color: #6c757d; }
     .marksheet-table th,
     .marksheet-table td { vertical-align: middle; }
     .marksheet-card { border: 1px solid rgba(15, 23, 42, 0.08); }
+    .remarks-table td {
+        vertical-align: middle;
+    }
+    .remarks-label {
+        width: 45%;
+        font-weight: 700;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+    }
     .signature-line {
         height: 1px;
         background: #111827;

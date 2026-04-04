@@ -21,6 +21,8 @@ use App\Http\Controllers\StudentWithdrawalController;
 Route::get('/', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+Route::get('/site-assets/logo', [SettingsController::class, 'logoAsset'])->name('site-assets.logo');
+Route::get('/site-assets/favicon', [SettingsController::class, 'faviconAsset'])->name('site-assets.favicon');
 
 // Authenticated routes
 Route::middleware('auth')->group(function () {
@@ -155,6 +157,9 @@ Route::middleware('auth')->group(function () {
             });
 
             Route::middleware('permission:settings.manage')->group(function () {
+            Route::get('/site', [SettingsController::class, 'siteSettings'])->name('settings.site');
+            Route::post('/site', [SettingsController::class, 'updateSiteSettings'])->name('settings.site.update');
+
             Route::get('/classes', [SettingsController::class, 'classes'])->name('settings.classes');
             Route::post('/classes', [SettingsController::class, 'storeClass'])->name('settings.classes.store');
             Route::delete('/classes/{class}', [SettingsController::class, 'destroyClass'])->name('settings.classes.destroy');

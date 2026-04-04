@@ -8,11 +8,90 @@ use App\Models\Subject;
 use App\Models\AcademicYear;
 use App\Models\NotificationSetting;
 use App\Models\PaymentGatewaySetting;
+use App\Models\SiteSetting;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SettingsController extends Controller
 {
+    public function siteSettings()
+    {
+        $settings = SiteSetting::current();
+
+        return view('settings.site-settings', compact('settings'));
+    }
+
+    public function updateSiteSettings(Request $request)
+    {
+        $settings = SiteSetting::current();
+
+        $validated = $request->validate([
+            'school_name' => 'required|string|max:255',
+            'address' => 'nullable|string|max:1000',
+            'contact_number' => 'nullable|string|max:50',
+            'contact_email' => 'nullable|email|max:255',
+            'logo' => 'nullable|image|max:2048',
+            'favicon' => 'nullable|image|max:1024',
+            'border_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'header_fill_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'title_bar_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'title_text_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'school_name_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'page_text_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+        ]);
+
+        if ($request->hasFile('logo')) {
+            if ($settings->logo_path) {
+                Storage::disk('public')->delete($settings->logo_path);
+            }
+
+            $validated['logo_path'] = $request->file('logo')->store('site-settings', 'public');
+        }
+
+        if ($request->hasFile('favicon')) {
+            if ($settings->favicon_path) {
+                Storage::disk('public')->delete($settings->favicon_path);
+            }
+
+            $validated['favicon_path'] = $request->file('favicon')->store('site-settings', 'public');
+        }
+
+        $settings->update([
+            'school_name' => $validated['school_name'],
+            'address' => $validated['address'] ?? null,
+            'contact_number' => $validated['contact_number'] ?? null,
+            'contact_email' => $validated['contact_email'] ?? null,
+            'logo_path' => $validated['logo_path'] ?? $settings->logo_path,
+            'favicon_path' => $validated['favicon_path'] ?? $settings->favicon_path,
+            'border_color' => $validated['border_color'] ?? '#7a4a00',
+            'header_fill_color' => $validated['header_fill_color'] ?? '#e8d5a3',
+            'title_bar_color' => $validated['title_bar_color'] ?? '#b8860b',
+            'title_text_color' => $validated['title_text_color'] ?? '#ffffff',
+            'school_name_color' => $validated['school_name_color'] ?? '#8b0000',
+            'page_text_color' => $validated['page_text_color'] ?? '#1a0a00',
+        ]);
+
+        return redirect()->route('settings.site')->with('success', 'Site settings updated.');
+    }
+
+    public function logoAsset(): StreamedResponse
+    {
+        $settings = SiteSetting::current();
+        abort_unless($settings->logo_path && Storage::disk('public')->exists($settings->logo_path), 404);
+
+        return Storage::disk('public')->response($settings->logo_path);
+    }
+
+    public function faviconAsset(): StreamedResponse
+    {
+        $settings = SiteSetting::current();
+        abort_unless($settings->favicon_path && Storage::disk('public')->exists($settings->favicon_path), 404);
+
+        return Storage::disk('public')->response($settings->favicon_path);
+    }
+
     public function classes()
     {
         $classes = SchoolClass::withCount(['sections', 'students'])->get();

@@ -16,15 +16,29 @@
         'spoken_english' => 'Spoken English',
         'personal_hygiene' => 'Personal Hygiene',
     ];
+    $schoolName = $siteSettings->school_name ?: config('app.name');
+    $schoolSubtitle = $siteSettings->address ?: 'School Address';
+    $contactLine = trim(collect([$siteSettings->contact_number, $siteSettings->contact_email])->filter()->implode(' | '));
 @endphp
 
 <div class="marksheet-shell {{ $forPdf ? 'pdf-mode' : '' }}">
-    <div class="text-center mb-3">
-        <h3 class="fw-bold mb-1">{{ config('app.name') }}</h3>
-        <div class="text-uppercase small text-muted fw-semibold">
+    <div class="marksheet-header mb-3">
+        <div class="marksheet-header-top">
+            @if(!empty($siteSettings->logo_url))
+                <img src="{{ $siteSettings->logo_url }}" alt="School Logo" class="marksheet-logo">
+            @endif
+            <div class="text-center">
+                <h3 class="fw-bold mb-1">{{ $schoolName }}</h3>
+                <div class="small text-muted fst-italic">{{ $schoolSubtitle }}</div>
+                @if($contactLine !== '')
+                    <div class="small text-muted fst-italic">{{ $contactLine }}</div>
+                @endif
+            </div>
+        </div>
+        <div class="text-uppercase small fw-semibold marksheet-title-bar">
             {{ $selectedExam->resolved_template === 'semester_2' ? 'Final / 2nd Semester Marksheet' : '1st Semester Marksheet' }}
         </div>
-        <div class="small text-muted">{{ $selectedExam->name }}</div>
+        <div class="small text-muted mt-1">{{ $selectedExam->name }}</div>
     </div>
 
     <div class="row g-3 mb-3">
@@ -168,13 +182,27 @@
         <div class="col-md-6">
             <div class="card marksheet-card h-100">
                 <div class="card-header bg-white fw-semibold">Remarks</div>
-                <div class="card-body">
-                    <div><strong>1st Unit Test:</strong> {{ $firstReport?->remarks_unit_test ?: '-' }}</div>
-                    <div class="mt-2"><strong>Half Yearly Exam:</strong> {{ $firstReport?->remarks_main_exam ?: '-' }}</div>
-                    @if($selectedExam->resolved_template === 'semester_2')
-                        <div class="mt-2"><strong>2nd Unit Test:</strong> {{ $secondReport?->remarks_unit_test ?: '-' }}</div>
-                        <div class="mt-2"><strong>Final Exam:</strong> {{ $secondReport?->remarks_main_exam ?: '-' }}</div>
-                    @endif
+                <div class="card-body p-0">
+                    <table class="table table-sm table-bordered mb-0 remarks-table">
+                        <tbody>
+                            <tr>
+                                <td class="remarks-label">1st Unit Test</td>
+                                <td>{{ $firstReport?->remarks_unit_test ?: '-' }}</td>
+                            </tr>
+                            <tr>
+                                <td class="remarks-label">Half Yearly</td>
+                                <td>{{ $firstReport?->remarks_main_exam ?: '-' }}</td>
+                            </tr>
+                            <tr>
+                                <td class="remarks-label">2nd Unit Test</td>
+                                <td>{{ $secondReport?->remarks_unit_test ?: '-' }}</td>
+                            </tr>
+                            <tr>
+                                <td class="remarks-label">Final Exams</td>
+                                <td>{{ $secondReport?->remarks_main_exam ?: '-' }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
