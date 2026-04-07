@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Route;
 
 class SiteSetting extends Model
 {
@@ -36,11 +37,23 @@ class SiteSetting extends Model
 
     public function getLogoUrlAttribute(): ?string
     {
-        return $this->logo_path ? route('site-assets.logo') : null;
+        if (!$this->logo_path) {
+            return null;
+        }
+
+        return Route::has('site-assets.logo')
+            ? route('site-assets.logo')
+            : asset('storage/' . $this->logo_path);
     }
 
     public function getFaviconUrlAttribute(): ?string
     {
-        return $this->favicon_path ? route('site-assets.favicon') : null;
+        if (!$this->favicon_path) {
+            return null;
+        }
+
+        return Route::has('site-assets.favicon')
+            ? route('site-assets.favicon')
+            : asset('storage/' . $this->favicon_path);
     }
 }
