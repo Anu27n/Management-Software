@@ -5,12 +5,12 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-dependencyResolution {
+dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
     }
 }
 
-rootProject.name = "SchoolMS"
+rootProject.name = "WAHS"
 include ':app'

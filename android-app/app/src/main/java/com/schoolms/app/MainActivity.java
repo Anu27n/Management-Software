@@ -2,7 +2,9 @@ package com.schoolms.app;
 
 import android.annotation.SuppressLint;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.net.Uri;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
@@ -13,22 +15,30 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
+import android.webkit.ValueCallback;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 public class MainActivity extends AppCompatActivity {
+
+    private static final String PREFS_NAME = "schoolms_webview_prefs";
+    private static final String PREF_COOKIES = "cookies";
 
     private WebView webView;
     private ProgressBar progressBar;
     private SwipeRefreshLayout swipeRefresh;
     private LinearLayout errorLayout;
     private String baseUrl;
+    private ValueCallback<Uri[]> filePathCallback;
+    private ActivityResultLauncher<Intent> fileChooserLauncher;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -49,6 +59,23 @@ public class MainActivity extends AppCompatActivity {
         errorLayout = findViewById(R.id.errorLayout);
         Button retryButton = findViewById(R.id.retryButton);
 
+        fileChooserLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+            if (filePathCallback == null) {
+                return;
+            }
+
+            Uri[] results = null;
+            if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                Intent data = result.getData();
+                if (data.getData() != null) {
+                    results = new Uri[]{data.getData()};
+                }
+            }
+
+            filePathCallback.onReceiveValue(results);
+            filePathCallback = null;
+        });
+
         setupWebView();
         setupSwipeRefresh();
 
@@ -58,7 +85,9 @@ public class MainActivity extends AppCompatActivity {
             webView.reload();
         });
 
-        if (isNetworkAvailable()) {
+        if (savedInstanceState != null) {
+            webView.restoreState(savedInstanceState);
+        } else if (isNetworkAvailable()) {
             webView.loadUrl(baseUrl);
         } else {
             showError();
@@ -71,11 +100,14 @@ public class MainActivity extends AppCompatActivity {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
+        settings.setAllowContentAccess(true);
         settings.setAllowFileAccess(false);
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
         settings.setSupportZoom(false);
         settings.setBuiltInZoomControls(false);
+        settings.setJavaScriptCanOpenWindowsAutomatically(true);
+        settings.setSupportMultipleWindows(true);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
 
@@ -83,6 +115,7 @@ public class MainActivity extends AppCompatActivity {
         CookieManager cookieManager = CookieManager.getInstance();
         cookieManager.setAcceptCookie(true);
         cookieManager.setAcceptThirdPartyCookies(webView, true);
+        restoreCookies();
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -94,6 +127,7 @@ public class MainActivity extends AppCompatActivity {
             public void onPageFinished(WebView view, String url) {
                 progressBar.setVisibility(View.GONE);
                 swipeRefresh.setRefreshing(false);
+                persistCookies(url);
             }
 
             @Override
@@ -122,7 +156,50 @@ public class MainActivity extends AppCompatActivity {
             public void onProgressChanged(WebView view, int newProgress) {
                 progressBar.setProgress(newProgress);
             }
+
+            @Override
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
+                if (MainActivity.this.filePathCallback != null) {
+                    MainActivity.this.filePathCallback.onReceiveValue(null);
+                }
+
+                MainActivity.this.filePathCallback = filePathCallback;
+
+                Intent intent = fileChooserParams.createIntent();
+                try {
+                    fileChooserLauncher.launch(intent);
+                } catch (Exception e) {
+                    MainActivity.this.filePathCallback = null;
+                    return false;
+                }
+                return true;
+            }
         });
+    }
+
+    private void persistCookies(String url) {
+        CookieManager cookieManager = CookieManager.getInstance();
+        String cookies = cookieManager.getCookie(url);
+        if (cookies != null && !cookies.isEmpty()) {
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+            prefs.edit().putString(PREF_COOKIES, cookies).apply();
+            cookieManager.flush();
+        }
+    }
+
+    private void restoreCookies() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String savedCookies = prefs.getString(PREF_COOKIES, null);
+        if (savedCookies == null || savedCookies.isEmpty()) {
+            return;
+        }
+
+        CookieManager cookieManager = CookieManager.getInstance();
+        String[] cookieArray = savedCookies.split(";\\s*");
+        for (String cookie : cookieArray) {
+            cookieManager.setCookie(baseUrl, cookie);
+        }
+        cookieManager.flush();
     }
 
     private void setupSwipeRefresh() {
@@ -168,8 +245,16 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onPause() {
+        super.onPause();
+        CookieManager.getInstance().flush();
+    }
+
+    @Override
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
-        webView.restoreState(savedInstanceState);
+        if (webView.getUrl() == null) {
+            webView.restoreState(savedInstanceState);
+        }
     }
 }
