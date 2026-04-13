@@ -4,29 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="#3b82f6">
+    <meta name="theme-color" content="{{ $siteSettings->app_primary_color ?? '#0f6b56' }}">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="{{ $siteSettings->logo_url ?? '/icons/icon-192.png' }}">
     <link rel="icon" type="image/png" href="{{ $siteSettings->favicon_url ?? '/favicon.ico' }}">
-    <title>@yield('title', $siteSettings->school_name ?: 'School Management System')</title>
+    <title>@yield('title', $siteSettings->school_name ?: 'Nehru Academy, Kanpur')</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
         :root {
             --sidebar-width: 260px;
-            --sidebar-bg: #1e293b;
-            --sidebar-text: #cbd5e1;
-            --sidebar-active: #3b82f6;
+            --sidebar-bg: {{ $siteSettings->app_sidebar_bg_color ?? '#031814' }};
+            --sidebar-text: {{ $siteSettings->app_sidebar_text_color ?? '#9fcfc3' }};
+            --sidebar-active: {{ $siteSettings->app_sidebar_active_color ?? '#14a27f' }};
             --topbar-height: 56px;
             --bottom-nav-height: 64px;
-            --primary: #3b82f6;
-            --primary-dark: #2563eb;
+            --primary: {{ $siteSettings->app_primary_color ?? '#0f6b56' }};
+            --primary-dark: {{ $siteSettings->app_primary_dark_color ?? '#0b5443' }};
             --surface: #ffffff;
-            --background: #f1f5f9;
-            --on-surface: #1e293b;
+            --background: {{ $siteSettings->app_background_color ?? '#eef6f3' }};
+            --on-surface: #113a31;
             --safe-bottom: env(safe-area-inset-bottom, 0px);
         }
 
@@ -50,13 +50,20 @@
             color: #fff; border-bottom: 1px solid rgba(255,255,255,0.08);
             display: flex; align-items: center; gap: 10px;
         }
+        .sidebar .brand .brand-logo {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1px solid rgba(255,255,255,0.25);
+        }
         .sidebar .nav-link {
             color: var(--sidebar-text); padding: 10px 20px; font-size: 0.9rem;
             display: flex; align-items: center; gap: 10px; border-radius: 0;
             transition: all 0.2s;
         }
         .sidebar .nav-link:hover, .sidebar .nav-link.active {
-            background: rgba(59,130,246,0.15); color: #fff;
+            background: rgba(20,162,127,0.16); color: #fff;
         }
         .sidebar .nav-link.active { border-left: 3px solid var(--sidebar-active); }
         .sidebar .nav-link i { font-size: 1.1rem; width: 22px; text-align: center; }
@@ -161,7 +168,7 @@
             color: #0f172a;
         }
         .quick-search-item:hover {
-            background: #eff6ff;
+            background: #e8f7f2;
             color: #0f172a;
         }
         .quick-search-title {
@@ -257,7 +264,7 @@
         .bottom-nav-item i { font-size: 1.35rem; margin-bottom: 2px; transition: transform 0.2s; }
         .bottom-nav-item.active { color: var(--primary); }
         .bottom-nav-item.active i { transform: scale(1.1); }
-        .bottom-nav-item:active { background: rgba(59,130,246,0.06); }
+        .bottom-nav-item:active { background: rgba(15,107,86,0.10); }
 
         /* More menu (overflow for extra nav items) */
         .more-menu {
@@ -282,7 +289,7 @@
             transition: background 0.2s;
         }
         .more-menu-item:hover, .more-menu-item:active {
-            background: rgba(59,130,246,0.06); color: var(--on-surface);
+            background: rgba(15,107,86,0.10); color: var(--on-surface);
         }
         .more-menu-item.active { color: var(--primary); font-weight: 600; }
         .more-menu-item i { font-size: 1.2rem; width: 24px; text-align: center; color: #64748b; }
@@ -306,11 +313,11 @@
             right: 16px; z-index: 1045;
             width: 56px; height: 56px; border-radius: 16px;
             background: var(--primary); color: #fff; border: none;
-            box-shadow: 0 4px 12px rgba(59,130,246,0.4);
+            box-shadow: 0 4px 12px rgba(15,107,86,0.38);
             font-size: 1.5rem; text-decoration: none;
             transition: transform 0.2s, box-shadow 0.2s;
         }
-        .mobile-fab:active { transform: scale(0.92); box-shadow: 0 2px 8px rgba(59,130,246,0.3); color: #fff; }
+        .mobile-fab:active { transform: scale(0.92); box-shadow: 0 2px 8px rgba(15,107,86,0.30); color: #fff; }
 
         /* ===== MOBILE RESPONSIVE ===== */
         @media (max-width: 991.98px) {
@@ -402,6 +409,13 @@
             width: 1rem;
             height: 1rem;
         }
+        .app-footer {
+            text-align: center;
+            color: #64748b;
+            font-size: 0.82rem;
+            margin-top: 20px;
+            padding: 10px 0 2px;
+        }
     </style>
     @stack('styles')
 </head>
@@ -449,8 +463,12 @@
     {{-- Desktop Sidebar --}}
     <nav class="sidebar" id="sidebar">
         <div class="brand">
-            <i class="bi bi-mortarboard-fill"></i>
-            <span>{{ $siteSettings->school_name ?: 'SchoolMS' }}</span>
+            @if($siteSettings->logo_url)
+                <img src="{{ $siteSettings->logo_url }}" alt="School Logo" class="brand-logo">
+            @else
+                <i class="bi bi-mortarboard-fill"></i>
+            @endif
+            <span>{{ $siteSettings->school_name ?: 'Nehru Academy, Kanpur' }}</span>
         </div>
 
         <div class="nav-section">Main</div>
@@ -637,6 +655,8 @@
             @endif
 
             @yield('content')
+
+            <div class="app-footer">Powered by Styx Corp LLP</div>
         </div>
     </div>
 

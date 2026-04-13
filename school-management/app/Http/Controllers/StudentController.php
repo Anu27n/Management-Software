@@ -15,6 +15,7 @@ use App\Support\UserCredentialSupport;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
@@ -605,6 +606,7 @@ class StudentController extends Controller
 
     private function mapStudentCoreData(array $validated): array
     {
+        $admissionNo = $this->resolveAdmissionNumber($validated);
         $studentLastName = trim(implode(' ', array_filter([
             trim((string) ($validated['student_middle_name'] ?? '')),
             trim((string) ($validated['student_surname'] ?? '')),
@@ -615,10 +617,10 @@ class StudentController extends Controller
             ?? null;
         $primaryEmail = $validated['father_email']
             ?? $validated['mother_email']
-            ?? strtolower($validated['student_s_no'] . '@school.local');
+            ?? strtolower($admissionNo . '@school.local');
 
         return [
-            'admission_no' => $validated['student_s_no'],
+            'admission_no' => $admissionNo,
             'first_name' => $validated['student_first_name'],
             'last_name' => $studentLastName,
             'gender' => $validated['gender'],
@@ -628,7 +630,7 @@ class StudentController extends Controller
             'nationality' => $validated['nationality'],
             'address' => $validated['residential_address'],
             'phone' => filled($primaryPhone) ? $primaryPhone : null,
-            'email' => filled($primaryEmail) ? $primaryEmail : strtolower($validated['student_s_no'] . '@school.local'),
+            'email' => filled($primaryEmail) ? $primaryEmail : strtolower($admissionNo . '@school.local'),
             'admission_date' => $validated['admission_date'],
             'previous_school' => $validated['last_school_name'] ?? null,
             'father_name' => filled($validated['father_name'] ?? null) ? $validated['father_name'] : 'N/A',
@@ -645,6 +647,21 @@ class StudentController extends Controller
             'academic_year_id' => $validated['academic_year_id'],
             'status' => 'active',
         ];
+    }
+
+    private function resolveAdmissionNumber(array $validated): string
+    {
+        $providedAdmissionNo = trim((string) ($validated['student_s_no'] ?? ''));
+
+        if ($providedAdmissionNo !== '') {
+            return $providedAdmissionNo;
+        }
+
+        do {
+            $generatedAdmissionNo = 'ADM-' . now()->format('Ymd') . '-' . Str::upper(Str::random(4));
+        } while (Student::where('admission_no', $generatedAdmissionNo)->exists());
+
+        return $generatedAdmissionNo;
     }
 
     private function mapStudentProfileData(array $validated): array
@@ -667,7 +684,7 @@ class StudentController extends Controller
         $secondSibling = $siblingDetails[1] ?? null;
 
         return [
-            'student_s_no' => $validated['student_s_no'],
+            'student_s_no' => filled($validated['student_s_no'] ?? null) ? $validated['student_s_no'] : null,
             'student_surname' => filled($validated['student_surname'] ?? null) ? $validated['student_surname'] : null,
             'student_first_name' => $validated['student_first_name'],
             'student_middle_name' => filled($validated['student_middle_name'] ?? null) ? $validated['student_middle_name'] : null,

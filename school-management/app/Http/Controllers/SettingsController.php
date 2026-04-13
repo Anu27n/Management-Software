@@ -40,6 +40,12 @@ class SettingsController extends Controller
             'title_text_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'school_name_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'page_text_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'app_primary_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'app_primary_dark_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'app_sidebar_bg_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'app_sidebar_text_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'app_sidebar_active_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'app_background_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
         ]);
 
         if ($request->hasFile('logo')) {
@@ -48,6 +54,22 @@ class SettingsController extends Controller
             }
 
             $validated['logo_path'] = $request->file('logo')->store('site-settings', 'public');
+
+            $derivedTheme = $this->deriveThemeColorsFromLogo($request->file('logo')->getRealPath());
+
+            if (!empty($derivedTheme)) {
+                foreach ($derivedTheme as $key => $value) {
+                    $isMissing = !array_key_exists($key, $validated);
+                    $isBlank = !$isMissing && blank($validated[$key]);
+                    $isUnchanged = !$isMissing
+                        && filled($settings->{$key} ?? null)
+                        && $validated[$key] === $settings->{$key};
+
+                    if ($isMissing || $isBlank || $isUnchanged) {
+                        $validated[$key] = $value;
+                    }
+                }
+            }
         }
 
         if ($request->hasFile('favicon')) {
@@ -71,9 +93,164 @@ class SettingsController extends Controller
             'title_text_color' => $validated['title_text_color'] ?? '#ffffff',
             'school_name_color' => $validated['school_name_color'] ?? '#8b0000',
             'page_text_color' => $validated['page_text_color'] ?? '#1a0a00',
+            'app_primary_color' => $validated['app_primary_color'] ?? '#0f6b56',
+            'app_primary_dark_color' => $validated['app_primary_dark_color'] ?? '#0b5443',
+            'app_sidebar_bg_color' => $validated['app_sidebar_bg_color'] ?? '#031814',
+            'app_sidebar_text_color' => $validated['app_sidebar_text_color'] ?? '#9fcfc3',
+            'app_sidebar_active_color' => $validated['app_sidebar_active_color'] ?? '#14a27f',
+            'app_background_color' => $validated['app_background_color'] ?? '#eef6f3',
         ]);
 
         return redirect()->route('settings.site')->with('success', 'Site settings updated.');
+    }
+
+    private function deriveThemeColorsFromLogo(string $logoPath): array
+    {
+        if (!is_file($logoPath)) {
+            return [];
+        }
+
+        $imageInfo = @getimagesize($logoPath);
+        if (!$imageInfo) {
+            return [];
+        }
+
+        $imageData = @file_get_contents($logoPath);
+        if ($imageData === false) {
+            return [];
+        }
+
+        $image = @imagecreatefromstring($imageData);
+        if ($image === false) {
+            return [];
+        }
+
+        $width = imagesx($image);
+        $height = imagesy($image);
+
+        if ($width <= 0 || $height <= 0) {
+            imagedestroy($image);
+            return [];
+        }
+
+        $sampleStepX = max(1, (int) floor($width / 60));
+        $sampleStepY = max(1, (int) floor($height / 60));
+        $buckets = [];
+
+        for ($y = 0; $y < $height; $y += $sampleStepY) {
+            for ($x = 0; $x < $width; $x += $sampleStepX) {
+                $rgba = imagecolorat($image, $x, $y);
+
+                $alpha = ($rgba & 0x7F000000) >> 24;
+                if ($alpha >= 120) {
+                    continue;
+                }
+
+                $r = ($rgba >> 16) & 0xFF;
+                $g = ($rgba >> 8) & 0xFF;
+                $b = $rgba & 0xFF;
+
+                $brightness = ($r * 299 + $g * 587 + $b * 114) / 1000;
+                if ($brightness > 245 || $brightness < 20) {
+                    continue;
+                }
+
+                $bucketR = (int) (round($r / 16) * 16);
+                $bucketG = (int) (round($g / 16) * 16);
+                $bucketB = (int) (round($b / 16) * 16);
+                $bucketKey = $bucketR . ',' . $bucketG . ',' . $bucketB;
+
+                if (!isset($buckets[$bucketKey])) {
+                    $buckets[$bucketKey] = [
+                        'count' => 0,
+                        'sum_r' => 0,
+                        'sum_g' => 0,
+                        'sum_b' => 0,
+                    ];
+                }
+
+                $buckets[$bucketKey]['count']++;
+                $buckets[$bucketKey]['sum_r'] += $r;
+                $buckets[$bucketKey]['sum_g'] += $g;
+                $buckets[$bucketKey]['sum_b'] += $b;
+            }
+        }
+
+        imagedestroy($image);
+
+        if (empty($buckets)) {
+            return [];
+        }
+
+        uasort($buckets, static function (array $a, array $b) {
+            return $b['count'] <=> $a['count'];
+        });
+
+        $top = reset($buckets);
+        if (!$top || $top['count'] <= 0) {
+            return [];
+        }
+
+        $baseR = (int) round($top['sum_r'] / $top['count']);
+        $baseG = (int) round($top['sum_g'] / $top['count']);
+        $baseB = (int) round($top['sum_b'] / $top['count']);
+
+        $primary = $this->rgbToHex($baseR, $baseG, $baseB);
+        $primaryDark = $this->adjustHexBrightness($primary, -24);
+        $sidebarBg = $this->adjustHexBrightness($primary, -58);
+        $sidebarText = $this->adjustHexBrightness($primary, 48);
+        $sidebarActive = $this->adjustHexBrightness($primary, 14);
+        $background = $this->adjustHexBrightness($primary, 88);
+
+        return [
+            'app_primary_color' => $primary,
+            'app_primary_dark_color' => $primaryDark,
+            'app_sidebar_bg_color' => $sidebarBg,
+            'app_sidebar_text_color' => $sidebarText,
+            'app_sidebar_active_color' => $sidebarActive,
+            'app_background_color' => $background,
+            'title_bar_color' => $primaryDark,
+            'title_text_color' => '#ffffff',
+            'school_name_color' => $this->adjustHexBrightness($primaryDark, -10),
+        ];
+    }
+
+    private function adjustHexBrightness(string $hex, int $percent): string
+    {
+        [$r, $g, $b] = $this->hexToRgb($hex);
+
+        if ($percent >= 0) {
+            $r = (int) round($r + (255 - $r) * ($percent / 100));
+            $g = (int) round($g + (255 - $g) * ($percent / 100));
+            $b = (int) round($b + (255 - $b) * ($percent / 100));
+        } else {
+            $factor = 1 + ($percent / 100);
+            $r = (int) round($r * $factor);
+            $g = (int) round($g * $factor);
+            $b = (int) round($b * $factor);
+        }
+
+        return $this->rgbToHex($r, $g, $b);
+    }
+
+    private function hexToRgb(string $hex): array
+    {
+        $normalized = ltrim($hex, '#');
+
+        return [
+            hexdec(substr($normalized, 0, 2)),
+            hexdec(substr($normalized, 2, 2)),
+            hexdec(substr($normalized, 4, 2)),
+        ];
+    }
+
+    private function rgbToHex(int $r, int $g, int $b): string
+    {
+        $r = max(0, min(255, $r));
+        $g = max(0, min(255, $g));
+        $b = max(0, min(255, $b));
+
+        return sprintf('#%02x%02x%02x', $r, $g, $b);
     }
 
     public function logoAsset(): StreamedResponse

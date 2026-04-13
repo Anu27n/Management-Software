@@ -111,14 +111,6 @@ class DashboardController extends Controller
         }
 
         $performanceBase = ExamResult::query()
-            ->select([
-                'exam_results.id',
-                'exam_results.student_id',
-                'exam_results.class_id',
-                'exam_results.total_marks',
-                'exam_results.calculated_total',
-                'exam_results.marks_obtained',
-            ])
             ->join('exams', 'exams.id', '=', 'exam_results.exam_id')
             ->join('students', 'students.id', '=', 'exam_results.student_id')
             ->where('exam_results.subject_category', 'scholastic');

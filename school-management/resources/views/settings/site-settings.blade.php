@@ -53,6 +53,37 @@
                 </div>
             </div>
 
+            <h6 class="fw-semibold text-primary mb-3">App Theme Colors</h6>
+            <div class="alert alert-light border mb-3">
+                These colors are used on login page, sidebar, top bar, and overall software theme.
+            </div>
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <label class="form-label">Primary Color</label>
+                    <input type="color" name="app_primary_color" class="form-control form-control-color" value="{{ old('app_primary_color', $settings->app_primary_color ?? '#0f6b56') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Primary Dark Color</label>
+                    <input type="color" name="app_primary_dark_color" class="form-control form-control-color" value="{{ old('app_primary_dark_color', $settings->app_primary_dark_color ?? '#0b5443') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Background Color</label>
+                    <input type="color" name="app_background_color" class="form-control form-control-color" value="{{ old('app_background_color', $settings->app_background_color ?? '#eef6f3') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Sidebar Background</label>
+                    <input type="color" name="app_sidebar_bg_color" class="form-control form-control-color" value="{{ old('app_sidebar_bg_color', $settings->app_sidebar_bg_color ?? '#031814') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Sidebar Text</label>
+                    <input type="color" name="app_sidebar_text_color" class="form-control form-control-color" value="{{ old('app_sidebar_text_color', $settings->app_sidebar_text_color ?? '#9fcfc3') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Sidebar Active Color</label>
+                    <input type="color" name="app_sidebar_active_color" class="form-control form-control-color" value="{{ old('app_sidebar_active_color', $settings->app_sidebar_active_color ?? '#14a27f') }}">
+                </div>
+            </div>
+
             <h6 class="fw-semibold text-primary mb-3">Report Card Colors</h6>
             <div class="row g-3 mb-4">
                 <div class="col-md-4">

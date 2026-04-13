@@ -23,7 +23,7 @@ class StoreComprehensiveStudentRequest extends FormRequest
         $motherOccupationOptions = ['Private Job', 'Government Job', 'Business', 'Professional', 'Housewife'];
 
         return [
-            'student_s_no' => ['required', 'string', 'max:50', 'unique:students,admission_no'],
+            'student_s_no' => ['nullable', 'string', 'max:50', 'unique:students,admission_no'],
             'student_surname' => ['nullable', 'string', 'max:100'],
             'student_first_name' => ['required', 'string', 'max:100'],
             'student_middle_name' => ['nullable', 'string', 'max:100'],

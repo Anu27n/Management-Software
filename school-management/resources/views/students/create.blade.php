@@ -6,8 +6,8 @@
 @php
     $qualificationOptions = [
         'illiterate' => 'Illiterate',
-        'school' => 'School',
-        'diploma' => 'Diploma',
+        'school' => 'High School',
+        'diploma' => 'Intermediate',
         'graduate' => 'Graduate',
         'postgraduate' => 'Post Graduate',
         'doctorate' => 'Doctorate',
@@ -55,8 +55,8 @@
             <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-person me-1"></i>Student Basic Details</h6>
             <div class="row g-3 mb-4">
                 <div class="col-md-3">
-                    <label class="form-label">Student S. No <span class="text-danger">*</span></label>
-                    <input type="text" name="student_s_no" class="form-control" value="{{ old('student_s_no') }}" required>
+                    <label class="form-label">Student S. No</label>
+                    <input type="text" name="student_s_no" class="form-control" value="{{ old('student_s_no') }}">
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">First Name <span class="text-danger">*</span></label>
@@ -293,6 +293,15 @@
                 <div class="col-md-2"><label class="form-label">Blood Group</label><input type="text" name="blood_group" class="form-control" value="{{ old('blood_group') }}"></div>
                 <div class="col-md-2"><label class="form-label">Height (cm)</label><input type="number" step="0.01" name="height_cm" class="form-control" value="{{ old('height_cm') }}"></div>
                 <div class="col-md-2"><label class="form-label">Weight (kg)</label><input type="number" step="0.01" name="weight_kg" class="form-control" value="{{ old('weight_kg') }}"></div>
+                <div class="col-md-3">
+                    <label class="form-label">Mode of Transport</label>
+                    <select name="transport_mode" class="form-select">
+                        <option value="">Select</option>
+                        <option value="parents" {{ old('transport_mode') === 'parents' ? 'selected' : '' }}>Parents</option>
+                        <option value="van/auto/rickshaw" {{ old('transport_mode') === 'van/auto/rickshaw' ? 'selected' : '' }}>Van/auto/rickshaw</option>
+                        <option value="self" {{ old('transport_mode') === 'self' ? 'selected' : '' }}>Self</option>
+                    </select>
+                </div>
             </div>
 
             <h6 class="fw-semibold text-primary mb-3"><i class="bi bi-building-gear me-1"></i>Office Use Only</h6>

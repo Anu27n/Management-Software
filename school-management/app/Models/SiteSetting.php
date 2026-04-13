@@ -20,6 +20,12 @@ class SiteSetting extends Model
         'title_text_color',
         'school_name_color',
         'page_text_color',
+        'app_primary_color',
+        'app_primary_dark_color',
+        'app_sidebar_bg_color',
+        'app_sidebar_text_color',
+        'app_sidebar_active_color',
+        'app_background_color',
     ];
 
     public static function current(): self
@@ -32,6 +38,12 @@ class SiteSetting extends Model
             'title_text_color' => '#ffffff',
             'school_name_color' => '#8b0000',
             'page_text_color' => '#1a0a00',
+            'app_primary_color' => '#0f6b56',
+            'app_primary_dark_color' => '#0b5443',
+            'app_sidebar_bg_color' => '#031814',
+            'app_sidebar_text_color' => '#9fcfc3',
+            'app_sidebar_active_color' => '#14a27f',
+            'app_background_color' => '#eef6f3',
         ]);
     }
 
