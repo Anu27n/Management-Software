@@ -131,11 +131,6 @@ class User extends Authenticatable
                 'leaves.apply',
                 'leaves.approve',
                 'exports.manage',
-                'timetable.view',
-                'timetable.manage',
-                'staff-leaves.manage',
-                'substitutes.manage',
-                'calendar.manage',
             ],
             'cashier' => [
                 'dashboard.view',
@@ -150,7 +145,6 @@ class User extends Authenticatable
                 'notices.view',
                 'reportcards.view',
                 'leaves.apply',
-                'timetable.view',
             ],
             default => [],
         };

@@ -446,11 +446,6 @@
         $canManageUsers = $authUser->hasPermission('users.manage');
         $canManageNotifications = $authUser->hasPermission('notifications.manage');
         $canManageRoles = $authUser->hasPermission('roles.manage');
-        $canViewTimetable = $authUser->hasPermission('timetable.view') || $authUser->hasPermission('timetable.manage');
-        $canManageTimetable = $authUser->hasPermission('timetable.manage');
-        $canManageStaffLeaves = $authUser->hasPermission('staff-leaves.manage');
-        $canManageSubstitutes = $authUser->hasPermission('substitutes.manage');
-        $canManageCalendar = $authUser->hasPermission('calendar.manage');
         $canUseQuickSearch = !$authUser->isParent()
             && !$authUser->isStudent()
             && (
@@ -510,11 +505,6 @@
             <i class="bi bi-file-earmark-bar-graph-fill"></i> Report Cards
         </a>
         @endif
-        @if($canViewTimetable)
-        <a href="{{ route('timetable.dashboard') }}" class="nav-link {{ request()->routeIs('timetable.*') ? 'active' : '' }}">
-            <i class="bi bi-calendar3-week-fill"></i> Smart Timetable
-        </a>
-        @endif
 
         <div class="nav-section">Management</div>
         @if($canManageFeeStructures)
@@ -557,26 +547,6 @@
         @if($canApplyLeaves)
         <a href="{{ route('leaves.index') }}" class="nav-link {{ request()->routeIs('leaves.*') ? 'active' : '' }}">
             <i class="bi bi-envelope-paper-fill"></i> Leave Applications
-        </a>
-        @endif
-        @if($canManageTimetable)
-        <a href="{{ route('timetable.student-courses') }}" class="nav-link {{ request()->routeIs('timetable.student-courses*') ? 'active' : '' }}">
-            <i class="bi bi-person-lines-fill"></i> Student Courses
-        </a>
-        @endif
-        @if($canManageStaffLeaves)
-        <a href="{{ route('timetable.staff-leaves') }}" class="nav-link {{ request()->routeIs('timetable.staff-leaves*') ? 'active' : '' }}">
-            <i class="bi bi-person-x-fill"></i> Staff Leaves
-        </a>
-        @endif
-        @if($canManageSubstitutes)
-        <a href="{{ route('timetable.substitutes') }}" class="nav-link {{ request()->routeIs('timetable.substitutes*') ? 'active' : '' }}">
-            <i class="bi bi-arrow-repeat"></i> Substitutes
-        </a>
-        @endif
-        @if($canManageCalendar)
-        <a href="{{ route('timetable.calendar') }}" class="nav-link {{ request()->routeIs('timetable.calendar*') ? 'active' : '' }}">
-            <i class="bi bi-calendar-event-fill"></i> School Calendar
         </a>
         @endif
 

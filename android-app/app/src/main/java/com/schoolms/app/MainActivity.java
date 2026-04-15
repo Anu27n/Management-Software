@@ -8,8 +8,6 @@ import android.net.Uri;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
-import android.text.InputType;
-import android.text.TextUtils;
 import android.view.KeyEvent;
 import android.view.View;
 import android.webkit.CookieManager;
@@ -26,17 +24,13 @@ import android.widget.ProgressBar;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
-
-import android.widget.EditText;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final String PREFS_NAME = "schoolms_webview_prefs";
     private static final String PREF_COOKIES = "cookies";
-    private static final String PREF_BASE_URL = "base_url";
 
     private WebView webView;
     private ProgressBar progressBar;
@@ -57,16 +51,13 @@ public class MainActivity extends AppCompatActivity {
             getSupportActionBar().hide();
         }
 
-        baseUrl = resolveBaseUrl();
+        baseUrl = BuildConfig.BASE_URL;
 
         webView = findViewById(R.id.webView);
         progressBar = findViewById(R.id.progressBar);
         swipeRefresh = findViewById(R.id.swipeRefresh);
         errorLayout = findViewById(R.id.errorLayout);
         Button retryButton = findViewById(R.id.retryButton);
-        Button timetableButton = findViewById(R.id.timetableButton);
-
-        timetableButton.setOnClickListener(v -> openTimetable());
 
         fileChooserLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
             if (filePathCallback == null) {
@@ -96,90 +87,11 @@ public class MainActivity extends AppCompatActivity {
 
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState);
-        } else if (!isValidBaseUrl(baseUrl)) {
-            promptForBaseUrl();
         } else if (isNetworkAvailable()) {
             webView.loadUrl(baseUrl);
         } else {
             showError();
         }
-    }
-
-    private String resolveBaseUrl() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        String savedBaseUrl = prefs.getString(PREF_BASE_URL, null);
-        if (!TextUtils.isEmpty(savedBaseUrl)) {
-            return savedBaseUrl;
-        }
-
-        if (!BuildConfig.BASE_URL.contains("your-server-url.com")) {
-            return normalizeUrl(BuildConfig.BASE_URL);
-        }
-
-        return "";
-    }
-
-    private boolean isValidBaseUrl(String url) {
-        return !TextUtils.isEmpty(url) && (url.startsWith("http://") || url.startsWith("https://"));
-    }
-
-    private String normalizeUrl(String url) {
-        if (url == null) {
-            return "";
-        }
-
-        String normalized = url.trim();
-        if (normalized.endsWith("/")) {
-            normalized = normalized.substring(0, normalized.length() - 1);
-        }
-
-        return normalized;
-    }
-
-    private void promptForBaseUrl() {
-        final EditText input = new EditText(this);
-        input.setHint("https://school.yourdomain.com");
-        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        input.setText(baseUrl);
-
-        new AlertDialog.Builder(this)
-            .setTitle(R.string.server_url_title)
-            .setMessage(R.string.server_url_message)
-            .setView(input)
-            .setCancelable(false)
-            .setPositiveButton(R.string.save, (dialog, which) -> {
-                String entered = normalizeUrl(input.getText().toString());
-                if (isValidBaseUrl(entered)) {
-                    baseUrl = entered;
-                    getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                        .edit()
-                        .putString(PREF_BASE_URL, baseUrl)
-                        .apply();
-
-                    if (isNetworkAvailable()) {
-                        webView.loadUrl(baseUrl);
-                    } else {
-                        showError();
-                    }
-                } else {
-                    promptForBaseUrl();
-                }
-            })
-            .show();
-    }
-
-    private void openTimetable() {
-        if (!isValidBaseUrl(baseUrl)) {
-            promptForBaseUrl();
-            return;
-        }
-
-        if (!isNetworkAvailable()) {
-            showError();
-            return;
-        }
-
-        webView.loadUrl(baseUrl + "/timetable");
     }
 
     @SuppressLint("SetJavaScriptEnabled")

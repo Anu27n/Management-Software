@@ -5,8 +5,4 @@
     <string name="no_connection">No Internet Connection</string>
     <string name="check_connection">Please check your internet connection and try again.</string>
     <string name="retry">Retry</string>
-    <string name="open_timetable">Timetable</string>
-    <string name="server_url_title">Set Server URL</string>
-    <string name="server_url_message">Enter your school panel URL to load the latest features.</string>
-    <string name="save">Save</string>
 </resources>

@@ -16,7 +16,6 @@ use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\QuickSearchController;
 use App\Http\Controllers\StudentWithdrawalController;
-use App\Http\Controllers\TimetableController;
 
 // Auth routes
 Route::get('/', [AuthController::class, 'showLogin'])->name('login');
@@ -121,38 +120,6 @@ Route::middleware('auth')->group(function () {
         // Leave approvals
         Route::post('/leaves/{leaf}/approve', [LeaveController::class, 'approve'])->name('leaves.approve');
         Route::post('/leaves/{leaf}/reject', [LeaveController::class, 'reject'])->name('leaves.reject');
-    });
-
-    Route::middleware('permission:timetable.view,timetable.manage')->group(function () {
-        Route::get('/timetable', [TimetableController::class, 'dashboard'])->name('timetable.dashboard');
-        Route::get('/timetable/grid', [TimetableController::class, 'index'])->name('timetable.index');
-    });
-
-    Route::middleware('permission:timetable.manage')->group(function () {
-        Route::post('/timetable/slots', [TimetableController::class, 'storeSlot'])->name('timetable.slots.store');
-        Route::post('/timetable/entries', [TimetableController::class, 'storeEntry'])->name('timetable.entries.store');
-        Route::post('/timetable/generate', [TimetableController::class, 'generate'])->name('timetable.generate');
-        Route::get('/timetable/student-courses', [TimetableController::class, 'studentCourses'])->name('timetable.student-courses');
-        Route::post('/timetable/student-courses', [TimetableController::class, 'saveStudentCourses'])->name('timetable.student-courses.save');
-    });
-
-    Route::middleware('permission:staff-leaves.manage')->group(function () {
-        Route::get('/timetable/staff-leaves', [TimetableController::class, 'staffLeaves'])->name('timetable.staff-leaves');
-        Route::post('/timetable/staff-leaves', [TimetableController::class, 'storeStaffLeave'])->name('timetable.staff-leaves.store');
-        Route::post('/timetable/staff-leaves/{leave}/approve', [TimetableController::class, 'approveStaffLeave'])->name('timetable.staff-leaves.approve');
-        Route::post('/timetable/staff-leaves/{leave}/reject', [TimetableController::class, 'rejectStaffLeave'])->name('timetable.staff-leaves.reject');
-    });
-
-    Route::middleware('permission:substitutes.manage')->group(function () {
-        Route::get('/timetable/substitutes', [TimetableController::class, 'substitutes'])->name('timetable.substitutes');
-        Route::post('/timetable/substitutes/auto-run', [TimetableController::class, 'runAutoSubstitutes'])->name('timetable.substitutes.auto-run');
-        Route::post('/timetable/cover-preferences', [TimetableController::class, 'updateCoverPreference'])->name('timetable.cover-preferences.update');
-    });
-
-    Route::middleware('permission:calendar.manage')->group(function () {
-        Route::get('/timetable/calendar', [TimetableController::class, 'calendar'])->name('timetable.calendar');
-        Route::post('/timetable/calendar', [TimetableController::class, 'storeEvent'])->name('timetable.calendar.store');
-        Route::delete('/timetable/calendar/{event}', [TimetableController::class, 'destroyEvent'])->name('timetable.calendar.destroy');
     });
 
     Route::middleware('permission:fees.manage,fees.setup.manage')->group(function () {
