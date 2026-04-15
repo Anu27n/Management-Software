@@ -71,4 +71,19 @@
 
     </LinearLayout>
 
+    <Button
+        android:id="@+id/timetableButton"
+        android:layout_width="wrap_content"
+        android:layout_height="40dp"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentBottom="true"
+        android:layout_marginEnd="14dp"
+        android:layout_marginBottom="18dp"
+        android:backgroundTint="#15803D"
+        android:paddingHorizontal="14dp"
+        android:text="@string/open_timetable"
+        android:textAllCaps="false"
+        android:textColor="#ffffff"
+        android:textSize="12sp" />
+
 </RelativeLayout>
