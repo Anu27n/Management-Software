@@ -19,8 +19,8 @@ android {
         versionCode 1
         versionName "1.0"
 
-        // Set your server URL here
-        buildConfigField "String", "BASE_URL", "\"https://your-server-url.com\""
+        // Fixed production server URL
+        buildConfigField "String", "BASE_URL", "\"https://wahs.stxs.cloud\""
     }
 
     signingConfigs {

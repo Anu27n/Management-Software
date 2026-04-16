@@ -523,13 +523,16 @@ class StudentController extends Controller
     {
         $classes = SchoolClass::with('sections')->get();
         $academicYears = AcademicYear::all();
-        $student->load('parentUser');
+        $student->load('parentUser', 'profile');
+        $canEditRte = $this->canEditRte(request()->user());
 
-        return view('students.edit', compact('student', 'classes', 'academicYears'));
+        return view('students.edit', compact('student', 'classes', 'academicYears', 'canEditRte'));
     }
 
     public function update(Request $request, Student $student)
     {
+        $canEditRte = $this->canEditRte($request->user());
+
         $validated = $request->validate([
             'admission_no' => 'required|unique:students,admission_no,' . $student->id,
             'first_name' => 'required|string|max:255',
@@ -562,8 +565,38 @@ class StudentController extends Controller
             'guardian_name' => 'nullable|string|max:255',
             'guardian_phone' => 'nullable|string|max:20',
             'guardian_relation' => 'nullable|string|max:100',
+            'rte' => 'nullable|in:yes,no',
             'status' => 'nullable|in:active,inactive,graduated,transferred',
         ]);
+
+        $className = SchoolClass::query()->whereKey($validated['class_id'])->value('name');
+        $isRteEligible = ClassEligibility::isRteEligible($className);
+        $existingRte = $student->profile?->rte;
+        $incomingRte = $validated['rte'] ?? null;
+
+        if ($canEditRte) {
+            $rte = $isRteEligible ? $incomingRte : null;
+
+            if ($isRteEligible && blank($rte)) {
+                throw ValidationException::withMessages([
+                    'rte' => 'The RTE field is required for classes up to 8th.',
+                ]);
+            }
+
+            if (! $isRteEligible && filled($incomingRte)) {
+                throw ValidationException::withMessages([
+                    'rte' => 'The RTE field is only allowed for classes up to 8th.',
+                ]);
+            }
+        } else {
+            if ($request->filled('rte') && $incomingRte !== $existingRte) {
+                throw ValidationException::withMessages([
+                    'rte' => 'You are not allowed to edit RTE.',
+                ]);
+            }
+
+            $rte = $existingRte;
+        }
 
         if ($request->hasFile('photo')) {
             $validated['photo'] = $request->file('photo')->store('students', 'public');
@@ -571,11 +604,19 @@ class StudentController extends Controller
 
         $generatedCredentials = null;
 
-        DB::transaction(function () use ($student, &$validated, &$generatedCredentials) {
+        DB::transaction(function () use ($student, &$validated, &$generatedCredentials, $rte) {
             [$parentUser, $generatedCredentials] = $this->resolveParentAccount($validated, $student);
             $validated['parent_user_id'] = $parentUser->id;
 
             $student->update($validated);
+
+            StudentProfile::updateOrCreate(
+                ['student_id' => $student->id],
+                [
+                    'student_first_name' => $validated['first_name'],
+                    'rte' => $rte,
+                ]
+            );
         });
 
         $successMessage = $generatedCredentials
@@ -591,6 +632,16 @@ class StudentController extends Controller
         }
 
         return $redirect;
+    }
+
+    private function canEditRte(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        return $user->hasAnyRole(['admin', 'employee', 'teacher'])
+            && ! $user->hasAnyRole(['parent', 'student']);
     }
 
     public function destroy(Student $student)
