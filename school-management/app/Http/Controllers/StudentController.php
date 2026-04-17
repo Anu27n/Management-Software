@@ -640,8 +640,7 @@ class StudentController extends Controller
             return false;
         }
 
-        return $user->hasAnyRole(['admin', 'employee', 'teacher'])
-            && ! $user->hasAnyRole(['parent', 'student']);
+        return $user->hasPermission('students.manage');
     }
 
     public function destroy(Student $student)
