@@ -524,6 +524,9 @@
             <a href="{{ route('fees.payments') }}" class="nav-link {{ request()->routeIs('fees.payments*') ? 'active' : '' }}">
                 <i class="bi bi-receipt-cutoff"></i> Fee Payments
             </a>
+            <a href="{{ route('fees.previous-dues') }}" class="nav-link {{ request()->routeIs('fees.previous-dues*') ? 'active' : '' }}">
+                <i class="bi bi-clock-history"></i> Previous Session Dues
+            </a>
             <a href="{{ route('fees.discounts') }}" class="nav-link {{ request()->routeIs('fees.discounts') ? 'active' : '' }}">
                 <i class="bi bi-percent"></i> Discount Records
             </a>
@@ -799,6 +802,9 @@
         </a>
         <a href="{{ route('fees.payments') }}" class="more-menu-item {{ request()->routeIs('fees.payments*') ? 'active' : '' }}">
             <i class="bi bi-receipt-cutoff"></i> Fee Payments
+        </a>
+        <a href="{{ route('fees.previous-dues') }}" class="more-menu-item {{ request()->routeIs('fees.previous-dues*') ? 'active' : '' }}">
+            <i class="bi bi-clock-history"></i> Previous Session Dues
         </a>
         <a href="{{ route('fees.discounts') }}" class="more-menu-item {{ request()->routeIs('fees.discounts') ? 'active' : '' }}">
             <i class="bi bi-percent"></i> Discount Records

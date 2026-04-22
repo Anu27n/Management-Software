@@ -16,6 +16,7 @@
     <div class="d-flex gap-2">
         <a href="{{ route('fees.discounts') }}" class="btn btn-outline-info btn-sm"><i class="bi bi-percent me-1"></i>Discount Records</a>
         <a href="{{ route('fees.due') }}" class="btn btn-outline-warning btn-sm"><i class="bi bi-exclamation-circle me-1"></i>Due Fees</a>
+        <a href="{{ route('fees.previous-dues') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-clock-history me-1"></i>Previous Session Dues</a>
         <div class="btn-group btn-group-sm">
             <a href="{{ route('export.payments.csv', request()->query()) }}" class="btn btn-outline-success"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
             <a href="{{ route('export.payments.pdf', request()->query()) }}" class="btn btn-outline-danger"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>

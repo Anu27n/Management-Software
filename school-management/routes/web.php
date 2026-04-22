@@ -136,6 +136,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/fees/payments', [FeeController::class, 'payments'])->name('fees.payments');
         Route::get('/fees/discounts', [FeeController::class, 'discounts'])->name('fees.discounts');
         Route::get('/fees/due', [FeeController::class, 'dueFees'])->name('fees.due');
+        Route::get('/fees/previous-session-dues', [FeeController::class, 'previousSessionDues'])->name('fees.previous-dues');
+        Route::post('/fees/previous-session-dues', [FeeController::class, 'storePreviousSessionDue'])->name('fees.previous-dues.store');
+        Route::post('/fees/previous-session-dues/{previousDue}/settle', [FeeController::class, 'settlePreviousSessionDue'])->name('fees.previous-dues.settle');
         Route::get('/fees/payments/create', [FeeController::class, 'createPayment'])->name('fees.payments.create');
         Route::post('/fees/payments', [FeeController::class, 'storePayment'])->name('fees.payments.store');
         Route::get('/fees/payments/{payment}', [FeeController::class, 'showPayment'])->name('fees.payments.show');

@@ -66,14 +66,14 @@
                     <tr>
                         <td class="fw-semibold">{{ $item['student']->full_name }}</td>
                         <td>{{ $item['student']->schoolClass?->name ?? '-' }}</td>
-                        <td>{{ $item['structure']->feeCategory?->name ?? '-' }}</td>
-                        <td>Rs {{ number_format($item['structure']->amount, 2) }}</td>
+                        <td>{{ $item['fee_head'] ?? ($item['structure']->feeCategory?->name ?? '-') }}</td>
+                        <td>Rs {{ number_format($item['total_amount'] ?? ($item['structure']->amount ?? 0), 2) }}</td>
                         <td>Rs {{ number_format($item['paid_amount'], 2) }}</td>
                         <td class="{{ $item['due_amount'] > 0 ? 'text-danger fw-semibold' : 'text-success fw-semibold' }}">
                             Rs {{ number_format($item['due_amount'], 2) }}
                         </td>
                         <td class="text-end">
-                            @if($item['due_amount'] > 0)
+                            @if($item['due_amount'] > 0 && ($item['can_pay_online'] ?? true) && $item['structure'])
                                 <button
                                     type="button"
                                     class="btn btn-sm btn-primary pay-online-btn"
@@ -86,6 +86,8 @@
                                 >
                                     <i class="bi bi-credit-card me-1"></i>Pay Online
                                 </button>
+                            @elseif($item['due_amount'] > 0)
+                                <span class="badge bg-warning text-dark">Pay at school office</span>
                             @else
                                 <span class="badge bg-success">Cleared</span>
                             @endif

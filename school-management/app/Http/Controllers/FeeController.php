@@ -6,6 +6,7 @@ use App\Models\FeeCategory;
 use App\Models\FeeDiscountRecord;
 use App\Models\FeeStructure;
 use App\Models\FeePayment;
+use App\Models\PreviousSessionDue;
 use App\Models\NotificationSetting;
 use App\Models\PaymentGatewaySetting;
 use App\Models\Student;
@@ -219,6 +220,94 @@ class FeeController extends Controller
             'totalDueAmount' => $dueRows->sum('total_due'),
             'totalDueHeads' => $dueRows->sum('due_heads'),
         ]);
+    }
+
+    public function previousSessionDues(Request $request)
+    {
+        $query = PreviousSessionDue::query()
+            ->with([
+                'student:id,first_name,last_name,admission_no,class_id,section_id',
+                'student.schoolClass:id,name',
+                'student.section:id,name',
+                'createdBy:id,name',
+            ]);
+
+        if ($request->filled('search')) {
+            $search = trim((string) $request->search);
+            $fullNameExpression = $this->studentFullNameExpression();
+
+            $query->whereHas('student', function ($studentQuery) use ($search, $fullNameExpression) {
+                $studentQuery->where(function ($q) use ($search, $fullNameExpression) {
+                    $q->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhereRaw($fullNameExpression . " LIKE ?", ["%{$search}%"])
+                        ->orWhere('admission_no', 'like', "%{$search}%");
+                });
+            });
+        }
+
+        if ($request->filled('class_id')) {
+            $query->whereHas('student', function ($studentQuery) use ($request) {
+                $studentQuery->where('class_id', $request->class_id);
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $previousDues = $query->latest()->paginate(20)->withQueryString();
+
+        $students = Student::query()
+            ->with(['schoolClass:id,name', 'section:id,name'])
+            ->where('status', 'active')
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get();
+
+        $classes = SchoolClass::query()->orderBy('name')->get();
+
+        $summary = [
+            'open_due_total' => (clone $query)->where('status', 'open')->sum('due_amount'),
+            'open_due_count' => (clone $query)->where('status', 'open')->count(),
+        ];
+
+        return view('fees.previous-session-dues', compact('previousDues', 'students', 'classes', 'summary'));
+    }
+
+    public function storePreviousSessionDue(Request $request)
+    {
+        $validated = $request->validate([
+            'student_id' => 'required|exists:students,id',
+            'previous_session' => 'required|string|max:100',
+            'due_amount' => 'required|numeric|min:0.01',
+            'remarks' => 'nullable|string',
+        ]);
+
+        PreviousSessionDue::create([
+            'student_id' => $validated['student_id'],
+            'previous_session' => $validated['previous_session'],
+            'due_amount' => $validated['due_amount'],
+            'status' => 'open',
+            'remarks' => $validated['remarks'] ?? null,
+            'created_by' => auth()->id(),
+        ]);
+
+        return redirect()->route('fees.previous-dues')->with('success', 'Previous session due added successfully.');
+    }
+
+    public function settlePreviousSessionDue(PreviousSessionDue $previousDue)
+    {
+        if ($previousDue->status === 'settled') {
+            return redirect()->route('fees.previous-dues')->with('success', 'This due is already marked as settled.');
+        }
+
+        $previousDue->update([
+            'status' => 'settled',
+            'settled_at' => now()->toDateString(),
+        ]);
+
+        return redirect()->route('fees.previous-dues')->with('success', 'Previous session due marked as settled.');
     }
 
     public function createPayment(Request $request)
@@ -610,6 +699,12 @@ class FeeController extends Controller
         $overviewItems = [];
         $totalDueAmount = 0;
         $totalPaidAmount = 0;
+        $openPreviousDuesByStudent = PreviousSessionDue::query()
+            ->whereIn('student_id', $students->pluck('id'))
+            ->where('status', 'open')
+            ->where('due_amount', '>', 0)
+            ->get()
+            ->groupBy('student_id');
 
         foreach ($students as $student) {
             $structures = $this->feeStructuresForStudent($student);
@@ -627,8 +722,28 @@ class FeeController extends Controller
                 $overviewItems[] = [
                     'student' => $student,
                     'structure' => $structure,
+                    'fee_head' => $structure->feeCategory?->name ?? 'N/A',
+                    'total_amount' => (float) $structure->amount,
                     'paid_amount' => $paidAmount,
                     'due_amount' => $dueAmount,
+                    'can_pay_online' => true,
+                ];
+            }
+
+            $openPreviousDues = $openPreviousDuesByStudent->get($student->id, collect());
+
+            foreach ($openPreviousDues as $previousDue) {
+                $previousDueAmount = (float) $previousDue->due_amount;
+                $totalDueAmount += $previousDueAmount;
+
+                $overviewItems[] = [
+                    'student' => $student,
+                    'structure' => null,
+                    'fee_head' => 'Previous Session Due - ' . $previousDue->previous_session,
+                    'total_amount' => $previousDueAmount,
+                    'paid_amount' => 0,
+                    'due_amount' => $previousDueAmount,
+                    'can_pay_online' => false,
                 ];
             }
         }
@@ -665,9 +780,18 @@ class FeeController extends Controller
                 return [$key => (float) $payment->total_paid];
             });
 
-        return $students->map(function ($student) use ($structures, $paymentMap) {
+        $openPreviousDuesByStudent = PreviousSessionDue::query()
+            ->whereIn('student_id', $students->pluck('id'))
+            ->where('status', 'open')
+            ->where('due_amount', '>', 0)
+            ->orderByDesc('due_amount')
+            ->get()
+            ->groupBy('student_id');
+
+        return $students->map(function ($student) use ($structures, $paymentMap, $openPreviousDuesByStudent) {
             $structureKey = $student->class_id . '-' . $student->academic_year_id;
             $studentStructures = $structures->get($structureKey, collect());
+            $studentPreviousDues = $openPreviousDuesByStudent->get($student->id, collect());
 
             $totalAssigned = 0.0;
             $totalPaid = 0.0;
@@ -690,6 +814,18 @@ class FeeController extends Controller
                         'due_amount' => $due,
                     ];
                 }
+            }
+
+            foreach ($studentPreviousDues as $previousDue) {
+                $previousDueAmount = (float) $previousDue->due_amount;
+
+                $totalAssigned += $previousDueAmount;
+                $totalDue += $previousDueAmount;
+
+                $dueBreakdown[] = [
+                    'fee_head' => 'Previous Session Due - ' . $previousDue->previous_session,
+                    'due_amount' => $previousDueAmount,
+                ];
             }
 
             return [

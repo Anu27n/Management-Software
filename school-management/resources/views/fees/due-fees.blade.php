@@ -12,6 +12,7 @@
         </div>
     </div>
     <div class="btn-group btn-group-sm">
+        <a href="{{ route('fees.previous-dues') }}" class="btn btn-outline-secondary">Previous Session Dues</a>
         <a href="{{ route('fees.payments') }}" class="btn btn-outline-primary">Fee Payments</a>
         <a href="{{ route('fees.payments.create') }}" class="btn btn-primary">Quick Record</a>
     </div>
