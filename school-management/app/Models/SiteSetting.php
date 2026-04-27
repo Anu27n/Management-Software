@@ -26,6 +26,11 @@ class SiteSetting extends Model
         'app_sidebar_text_color',
         'app_sidebar_active_color',
         'app_background_color',
+        'fee_bootstrap_defaults',
+    ];
+
+    protected $casts = [
+        'fee_bootstrap_defaults' => 'array',
     ];
 
     public static function current(): self

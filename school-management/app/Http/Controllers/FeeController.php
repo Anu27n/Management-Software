@@ -12,6 +12,8 @@ use App\Models\PaymentGatewaySetting;
 use App\Models\Student;
 use App\Models\SchoolClass;
 use App\Models\AcademicYear;
+use App\Support\FeeStructureApplicability;
+use App\Support\QuarterlyFeeDueDates;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -72,9 +74,49 @@ class FeeController extends Controller
             'amount' => 'required|numeric|min:0',
             'frequency' => 'required|in:monthly,quarterly,half_yearly,yearly,one_time',
             'due_date' => 'nullable|date',
+            'new_admission_only' => 'sometimes|boolean',
         ]);
 
-        FeeStructure::create($validated);
+        $appliesTo = $request->boolean('new_admission_only') ? 'new_admission_only' : 'all_students';
+
+        if ($validated['frequency'] === 'quarterly') {
+            $academicYear = AcademicYear::findOrFail($validated['academic_year_id']);
+            $quarterDueDates = QuarterlyFeeDueDates::dueDatesWithinAcademicYear($academicYear);
+
+            if ($quarterDueDates === []) {
+                return back()->withErrors([
+                    'frequency' => 'No quarterly due dates (15th of Apr, Jul, Oct, Jan) fall within this academic year. Adjust the session dates and try again.',
+                ])->withInput();
+            }
+
+            $base = [
+                'fee_category_id' => $validated['fee_category_id'],
+                'class_id' => $validated['class_id'],
+                'academic_year_id' => $validated['academic_year_id'],
+                'amount' => $validated['amount'],
+                'frequency' => 'quarterly',
+                'applies_to' => $appliesTo,
+            ];
+
+            DB::transaction(function () use ($base, $quarterDueDates) {
+                foreach ($quarterDueDates as $due) {
+                    FeeStructure::create(array_merge($base, [
+                        'due_date' => $due->format('Y-m-d'),
+                    ]));
+                }
+            });
+
+            return redirect()->route('fees.structures')->with(
+                'success',
+                'Quarterly fee added: ' . count($quarterDueDates) . ' instalment(s) for this session, each due on the 15th of the quarter month within the academic year.'
+            );
+        }
+
+        $payload = array_merge($validated, ['applies_to' => $appliesTo]);
+        unset($payload['new_admission_only']);
+
+        FeeStructure::create($payload);
+
         return redirect()->route('fees.structures')->with('success', 'Fee structure created.');
     }
 
@@ -172,7 +214,7 @@ class FeeController extends Controller
 
     public function dueFees(Request $request)
     {
-        $studentsQuery = Student::with(['schoolClass:id,name', 'section:id,name'])
+        $studentsQuery = Student::with(['schoolClass:id,name', 'section:id,name', 'academicYear'])
             ->where('status', 'active');
 
         if ($request->filled('class_id')) {
@@ -312,7 +354,7 @@ class FeeController extends Controller
 
     public function createPayment(Request $request)
     {
-        $students = Student::with(['schoolClass:id,name', 'section:id,name', 'parentUser:id,name'])
+        $students = Student::with(['schoolClass:id,name', 'section:id,name', 'parentUser:id,name', 'academicYear', 'profile:id,student_id,fee_booklet_number'])
             ->where('status', 'active')
             ->orderBy('first_name')
             ->orderBy('last_name')
@@ -338,8 +380,8 @@ class FeeController extends Controller
     {
         $validated = $request->validate([
             'student_id' => 'required|exists:students,id',
-            'fee_structure_id' => 'required|exists:fee_structures,id',
-            'amount_paid' => 'required|numeric|min:0',
+            'fee_structure_id' => 'nullable|exists:fee_structures,id',
+            'amount_paid' => 'nullable|numeric|min:0',
             'discount' => 'nullable|numeric|min:0',
             'fine' => 'nullable|numeric|min:0',
             'payment_date' => 'required|date',
@@ -351,8 +393,12 @@ class FeeController extends Controller
             'razorpay_order_id' => 'nullable|string|max:255',
             'razorpay_payment_id' => 'nullable|string|max:255',
             'razorpay_signature' => 'nullable|string|max:255',
-            'status' => 'required|in:paid,partial',
+            'status' => 'nullable|in:paid,partial',
             'remarks' => 'nullable|string',
+            'bb_number' => 'nullable|string|max:255',
+            'payments' => 'nullable|array',
+            'payments.*.fee_structure_id' => 'nullable|exists:fee_structures,id',
+            'payments.*.amount' => 'nullable|numeric|min:0',
         ]);
 
         $validated['payment_method'] = $this->mapLegacyPaymentMethod($validated['payment_channel']);
@@ -401,13 +447,105 @@ class FeeController extends Controller
             $validated['razorpay_signature']
         );
 
-        $validated['receipt_no'] = 'RCP-' . date('Ymd') . '-' . str_pad(FeePayment::count() + 1, 4, '0', STR_PAD_LEFT);
-        $validated['collected_by'] = auth()->id();
-        $validated['discount'] = $validated['discount'] ?? 0;
-        $validated['fine'] = $validated['fine'] ?? 0;
+        $student = Student::with('profile:id,student_id,fee_booklet_number')->findOrFail($validated['student_id']);
+        $bbNumber = trim((string) ($validated['bb_number'] ?? $this->resolveStudentBillBookNumber($student)));
+        $paymentRows = collect($validated['payments'] ?? [])
+            ->filter(function ($row) {
+                return !empty($row['fee_structure_id']) && (float) ($row['amount'] ?? 0) > 0;
+            })
+            ->values();
 
-        $payment = FeePayment::create($validated);
-        $this->recordDiscountIfNeeded($payment, $validated['discount'], $validated['remarks'] ?? null);
+        if ($paymentRows->isEmpty()) {
+            if (empty($validated['fee_structure_id']) || empty($validated['amount_paid'])) {
+                return back()->withErrors([
+                    'amount_paid' => 'Select at least one due fee head and enter amount to record payment.',
+                ])->withInput();
+            }
+
+            $paymentRows = collect([
+                [
+                    'fee_structure_id' => (int) $validated['fee_structure_id'],
+                    'amount' => (float) $validated['amount_paid'],
+                ],
+            ]);
+        }
+
+        try {
+            $recordedPayments = DB::transaction(function () use ($paymentRows, $student, $validated, $bbNumber) {
+                $recorded = [];
+
+                foreach ($paymentRows as $index => $row) {
+                    $structure = FeeStructure::query()
+                        ->whereKey($row['fee_structure_id'])
+                        ->where('class_id', $student->class_id)
+                        ->where('academic_year_id', $student->academic_year_id)
+                        ->first();
+
+                    if (!$structure) {
+                        throw new \RuntimeException('One of the selected fee heads does not match the student class/session.');
+                    }
+
+                    if (!FeeStructureApplicability::appliesToStudent($structure, $student)) {
+                        throw new \RuntimeException('One of the selected fee heads is not applicable for this student.');
+                    }
+
+                    $alreadyPaid = (float) FeePayment::query()
+                        ->where('student_id', $student->id)
+                        ->where('fee_structure_id', $structure->id)
+                        ->sum('amount_paid');
+
+                    $dueAmount = max(0, (float) $structure->amount - $alreadyPaid);
+                    $entryAmount = (float) ($row['amount'] ?? 0);
+
+                    if ($dueAmount <= 0) {
+                        throw new \RuntimeException('A selected fee head is already fully paid and cannot be changed.');
+                    }
+
+                    if ($entryAmount > $dueAmount) {
+                        throw new \RuntimeException('Entered amount exceeds due amount for one of the selected fee heads.');
+                    }
+
+                    $discount = $index === 0 ? (float) ($validated['discount'] ?? 0) : 0.0;
+                    $fine = $index === 0 ? (float) ($validated['fine'] ?? 0) : 0.0;
+                    $finalPaidAgainstHead = $alreadyPaid + $entryAmount;
+
+                    $payment = FeePayment::create([
+                        'student_id' => $student->id,
+                        'fee_structure_id' => $structure->id,
+                        'amount_paid' => $entryAmount,
+                        'discount' => $discount,
+                        'fine' => $fine,
+                        'payment_date' => $validated['payment_date'],
+                        'payment_method' => $validated['payment_method'],
+                        'payment_location' => $validated['payment_location'],
+                        'payment_channel' => $validated['payment_channel'],
+                        'transaction_id' => $validated['transaction_id'] ?? null,
+                        'utr_number' => $validated['utr_number'] ?? null,
+                        'cheque_number' => $validated['cheque_number'] ?? null,
+                        'receipt_no' => 'RCP-' . date('Ymd') . '-' . str_pad(FeePayment::count() + 1, 4, '0', STR_PAD_LEFT),
+                        'bb_number' => $bbNumber !== '' ? $bbNumber : null,
+                        'status' => $finalPaidAgainstHead >= (float) $structure->amount ? 'paid' : 'partial',
+                        'remarks' => $validated['remarks'] ?? null,
+                        'collected_by' => auth()->id(),
+                    ]);
+
+                    $this->recordDiscountIfNeeded($payment, $discount, $validated['remarks'] ?? null);
+                    $recorded[] = $payment;
+                }
+
+                return $recorded;
+            });
+        } catch (\RuntimeException $exception) {
+            return back()->withErrors([
+                'amount_paid' => $exception->getMessage(),
+            ])->withInput();
+        }
+
+        if (count($recordedPayments) === 0) {
+            return back()->withErrors([
+                'amount_paid' => 'No payment rows were recorded.',
+            ])->withInput();
+        }
 
         return redirect()->route('fees.payments')->with('success', 'Payment recorded successfully.');
     }
@@ -499,6 +637,8 @@ class FeeController extends Controller
             ->where('academic_year_id', $student->academic_year_id)
             ->firstOrFail();
 
+        abort_unless(FeeStructureApplicability::appliesToStudent($structure, $student), 422, 'This fee does not apply to this student.');
+
         $paidAmount = (float) FeePayment::query()
             ->where('student_id', $student->id)
             ->where('fee_structure_id', $structure->id)
@@ -554,8 +694,39 @@ class FeeController extends Controller
     public function getStudentFees(Student $student)
     {
         $structures = $this->feeStructuresForStudent($student);
+        $paymentsByStructure = FeePayment::query()
+            ->select('fee_structure_id', DB::raw('SUM(amount_paid) as total_paid'))
+            ->where('student_id', $student->id)
+            ->groupBy('fee_structure_id')
+            ->get()
+            ->mapWithKeys(fn ($row) => [(int) $row->fee_structure_id => (float) $row->total_paid]);
 
-        return response()->json($structures);
+        $rows = $structures->map(function (FeeStructure $structure) use ($paymentsByStructure) {
+            $paidAmount = (float) ($paymentsByStructure[$structure->id] ?? 0);
+            $assignedAmount = (float) $structure->amount;
+            $dueAmount = max(0, $assignedAmount - $paidAmount);
+
+            return [
+                'id' => $structure->id,
+                'fee_head' => $structure->feeCategory?->name ?? 'Fee',
+                'assigned_amount' => $assignedAmount,
+                'paid_amount' => min($assignedAmount, $paidAmount),
+                'due_amount' => $dueAmount,
+                'is_locked' => $dueAmount <= 0,
+            ];
+        })->values();
+
+        return response()->json([
+            'student' => [
+                'id' => $student->id,
+                'admission_no' => $student->admission_no,
+                'full_name' => $student->full_name,
+                'class_name' => $student->schoolClass?->name,
+                'section_name' => $student->section?->name,
+            ],
+            'bb_number' => $this->resolveStudentBillBookNumber($student),
+            'rows' => $rows,
+        ]);
     }
 
     public function myFees()
@@ -563,7 +734,7 @@ class FeeController extends Controller
         $user = auth()->user();
         abort_unless($user->isParent() || $user->isStudent(), 403, 'Unauthorized.');
 
-        $studentsQuery = Student::with(['schoolClass:id,name', 'section:id,name']);
+        $studentsQuery = Student::with(['schoolClass:id,name', 'section:id,name', 'academicYear']);
 
         if ($user->isParent()) {
             $studentsQuery->where('parent_user_id', $user->id);
@@ -617,6 +788,8 @@ class FeeController extends Controller
             ->where('class_id', $student->class_id)
             ->where('academic_year_id', $student->academic_year_id)
             ->firstOrFail();
+
+        abort_unless(FeeStructureApplicability::appliesToStudent($structure, $student), 422, 'This fee does not apply to this student.');
 
         $gatewaySettings = PaymentGatewaySetting::query()
             ->where('provider', 'razorpay')
@@ -691,7 +864,10 @@ class FeeController extends Controller
             ->where('class_id', $student->class_id)
             ->where('academic_year_id', $student->academic_year_id)
             ->orderBy('fee_category_id')
-            ->get();
+            ->orderBy('due_date')
+            ->get()
+            ->filter(fn (FeeStructure $structure) => FeeStructureApplicability::appliesToStudent($structure, $student))
+            ->values();
     }
 
     private function buildFeeOverviewForStudents(Collection $students): array
@@ -799,6 +975,10 @@ class FeeController extends Controller
             $dueBreakdown = [];
 
             foreach ($studentStructures as $structure) {
+                if (!FeeStructureApplicability::appliesToStudent($structure, $student)) {
+                    continue;
+                }
+
                 $assigned = (float) $structure->amount;
                 $paidKey = $student->id . '-' . $structure->id;
                 $paid = min($assigned, (float) ($paymentMap[$paidKey] ?? 0.0));
@@ -942,5 +1122,13 @@ class FeeController extends Controller
         } catch (Throwable $exception) {
             // Do not block payment recording if notification delivery fails.
         }
+    }
+
+    private function resolveStudentBillBookNumber(Student $student): ?string
+    {
+        $student->loadMissing('profile:id,student_id,fee_booklet_number');
+        $value = trim((string) ($student->profile?->fee_booklet_number ?? ''));
+
+        return $value !== '' ? $value : null;
     }
 }

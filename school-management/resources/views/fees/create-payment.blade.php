@@ -4,10 +4,6 @@
 
 @section('content')
 @php
-    $razorpayReady = $gatewaySettings->is_enabled
-        && !blank($gatewaySettings->key_id)
-        && !blank($gatewaySettings->key_secret);
-
     $studentPayload = $students->map(fn ($student) => [
         'id' => $student->id,
         'label' => trim($student->admission_no . ' - ' . $student->full_name),
@@ -16,6 +12,7 @@
         'class_name' => $student->schoolClass?->name,
         'section_name' => $student->section?->name,
         'parent_name' => $student->parentUser?->name,
+        'bb_number' => $student->profile?->fee_booklet_number,
         'search' => strtolower(implode(' ', array_filter([
             $student->admission_no,
             $student->full_name,
@@ -25,6 +22,7 @@
             $student->mother_name,
             $student->guardian_name,
             $student->parentUser?->name,
+            $student->profile?->fee_booklet_number,
         ]))),
     ])->values();
 @endphp
@@ -35,15 +33,12 @@
             @csrf
 
             <input type="hidden" name="student_id" id="student_id" value="{{ old('student_id', $selectedStudent?->id) }}">
-            <input type="hidden" name="razorpay_order_id" id="razorpay_order_id" value="{{ old('razorpay_order_id') }}">
-            <input type="hidden" name="razorpay_payment_id" id="razorpay_payment_id" value="{{ old('razorpay_payment_id') }}">
-            <input type="hidden" name="razorpay_signature" id="razorpay_signature" value="{{ old('razorpay_signature') }}">
 
             <div class="row g-3">
                 <div class="col-12">
                     <label class="form-label">Quick Student Search <span class="text-danger">*</span></label>
                     <input type="text" id="student_search" class="form-control" placeholder="Search by student name, admission number, class, parent, guardian" autocomplete="off" value="{{ $selectedStudent ? $selectedStudent->admission_no . ' - ' . $selectedStudent->full_name : '' }}" required>
-                    <div class="form-text">Search first, select the student, then choose the fee head and record payment.</div>
+                    <div class="form-text">Select student to load assigned fee heads. Paid heads are locked automatically.</div>
                     <div id="student_search_results" class="list-group mt-2 d-none"></div>
                 </div>
 
@@ -58,20 +53,9 @@
                     </div>
                 </div>
 
-                <div class="col-md-6">
-                    <label class="form-label">Fee Structure <span class="text-danger">*</span></label>
-                    <select name="fee_structure_id" id="fee_structure_id" class="form-select" required>
-                        <option value="">Select Fee</option>
-                        @foreach($selectedStructures as $structure)
-                            <option value="{{ $structure->id }}" {{ old('fee_structure_id') == $structure->id ? 'selected' : '' }}>
-                                {{ $structure->feeCategory->name }} - {{ $structure->schoolClass->name }} (Rs {{ number_format($structure->amount) }})
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
                 <div class="col-md-3">
-                    <label class="form-label">Amount Paid (Rs) <span class="text-danger">*</span></label>
-                    <input id="amount_paid" type="number" name="amount_paid" class="form-control" step="0.01" value="{{ old('amount_paid') }}" required>
+                    <label class="form-label">B.B Number</label>
+                    <input type="text" name="bb_number" id="bb_number" class="form-control" value="{{ old('bb_number') }}" placeholder="Auto from admission; editable">
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Payment Date <span class="text-danger">*</span></label>
@@ -98,13 +82,6 @@
                         <option value="">Select</option>
                     </select>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">Status <span class="text-danger">*</span></label>
-                    <select id="status" name="status" class="form-select" required>
-                        <option value="paid" {{ old('status') === 'paid' ? 'selected' : '' }}>Fully Paid</option>
-                        <option value="partial" {{ old('status') === 'partial' ? 'selected' : '' }}>Partially Paid</option>
-                    </select>
-                </div>
                 <div class="col-md-6">
                     <label class="form-label">Transaction ID</label>
                     <input id="transaction_id" type="text" name="transaction_id" class="form-control" value="{{ old('transaction_id') }}">
@@ -118,33 +95,61 @@
                     <input type="text" name="cheque_number" class="form-control" value="{{ old('cheque_number') }}">
                 </div>
 
-                <div id="onlineGatewayNotice" class="col-12 d-none">
-                    <div class="alert alert-warning mb-0">
-                        Razorpay is not enabled in payment settings. Enter the online transaction ID manually.
-                    </div>
-                </div>
-
-                <div id="razorpaySection" class="col-12 d-none">
-                    <div class="border rounded p-3 bg-light">
-                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                            <div>
-                                <h6 class="mb-1 fw-semibold">Razorpay Checkout</h6>
-                                <p class="text-muted small mb-0">Use the button below to collect fee online and auto-fill verified transaction details.</p>
-                            </div>
-                            <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">Configured</span>
-                        </div>
-                        <div class="d-flex flex-wrap gap-2 align-items-center">
-                            <button type="button" id="payWithRazorpayBtn" class="btn btn-success">
-                                <i class="bi bi-credit-card me-1"></i>Pay with Razorpay
-                            </button>
-                            <small id="razorpayStatus" class="text-muted">Awaiting payment.</small>
-                        </div>
-                    </div>
-                </div>
-
                 <div class="col-12">
                     <label class="form-label">Remarks</label>
                     <textarea name="remarks" class="form-control" rows="2">{{ old('remarks') }}</textarea>
+                </div>
+
+                <div class="col-12" id="feeChartContainer">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                        <h6 class="mb-0 fw-semibold">Fees Chart</h6>
+                        <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-outline-primary" id="printChartBtn"><i class="bi bi-printer me-1"></i>Print</button>
+                            <button type="button" class="btn btn-outline-danger" id="pdfChartBtn"><i class="bi bi-file-earmark-pdf me-1"></i>Download PDF</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive border rounded">
+                        <table class="table table-sm align-middle mb-0" id="feeChartTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 60px;">S.No.</th>
+                                    <th>Fee Head</th>
+                                    <th style="width: 140px;">Assigned</th>
+                                    <th style="width: 140px;">Paid</th>
+                                    <th style="width: 140px;">Due</th>
+                                    <th style="width: 220px;">Collect Now</th>
+                                </tr>
+                            </thead>
+                            <tbody id="feeChartBody">
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-3">Select a student to load fee chart.</td>
+                                </tr>
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <th colspan="2">Total</th>
+                                    <th id="assignedTotalCell">Rs 0.00</th>
+                                    <th id="paidTotalCell">Rs 0.00</th>
+                                    <th id="dueTotalCell">Rs 0.00</th>
+                                    <th id="collectTotalCell">Rs 0.00</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <small class="text-muted d-block mt-2">Paid rows are locked. Enter amount only in due rows to collect quickly.</small>
+                </div>
+
+                <div class="col-12 d-none print-only" id="printSignatures">
+                    <div class="d-flex justify-content-between mt-5">
+                        <div class="text-center" style="width: 45%;">
+                            <div style="border-top: 1px solid #333; margin-bottom: 4px;"></div>
+                            <strong>Sign. of Accountant</strong>
+                        </div>
+                        <div class="text-center" style="width: 45%;">
+                            <div style="border-top: 1px solid #333; margin-bottom: 4px;"></div>
+                            <strong>Sign. of Office - Incharge</strong>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -157,11 +162,18 @@
 </div>
 @endsection
 
-@if($razorpayReady)
-    @push('scripts')
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-    @endpush
-@endif
+@push('styles')
+<style>
+    @media print {
+        .btn, .form-text, #student_search_results, .navbar, .sidebar, .main-header {
+            display: none !important;
+        }
+        .print-only {
+            display: block !important;
+        }
+    }
+</style>
+@endpush
 
 @push('scripts')
 <script>
@@ -173,28 +185,22 @@
 
         const paymentLocationEl = document.getElementById('payment_location');
         const paymentChannelEl = document.getElementById('payment_channel');
-        const amountEl = document.getElementById('amount_paid');
-        const transactionEl = document.getElementById('transaction_id');
-        const statusEl = document.getElementById('status');
         const studentIdEl = document.getElementById('student_id');
+        const bbNumberEl = document.getElementById('bb_number');
         const studentSearchEl = document.getElementById('student_search');
         const studentResultsEl = document.getElementById('student_search_results');
         const selectedStudentCardEl = document.getElementById('selected_student_card');
         const selectedStudentNameEl = document.getElementById('selected_student_name');
         const selectedStudentMetaEl = document.getElementById('selected_student_meta');
-        const feeStructureEl = document.getElementById('fee_structure_id');
-        const razorpaySectionEl = document.getElementById('razorpaySection');
-        const onlineGatewayNoticeEl = document.getElementById('onlineGatewayNotice');
-        const payWithRazorpayBtn = document.getElementById('payWithRazorpayBtn');
-        const razorpayStatusEl = document.getElementById('razorpayStatus');
-        const orderIdEl = document.getElementById('razorpay_order_id');
-        const paymentIdEl = document.getElementById('razorpay_payment_id');
-        const signatureEl = document.getElementById('razorpay_signature');
-
-        const razorpayReady = {{ $razorpayReady ? 'true' : 'false' }};
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const feeChartBodyEl = document.getElementById('feeChartBody');
+        const assignedTotalCellEl = document.getElementById('assignedTotalCell');
+        const paidTotalCellEl = document.getElementById('paidTotalCell');
+        const dueTotalCellEl = document.getElementById('dueTotalCell');
+        const collectTotalCellEl = document.getElementById('collectTotalCell');
+        const printChartBtn = document.getElementById('printChartBtn');
+        const pdfChartBtn = document.getElementById('pdfChartBtn');
+        const feeChartContainerEl = document.getElementById('feeChartContainer');
         const students = @json($studentPayload);
-        const selectedFeeStructureId = "{{ old('fee_structure_id') }}";
         const locationModeMap = {
             school: [
                 { value: 'cash', label: 'Cash' },
@@ -209,32 +215,35 @@
             ],
         };
 
-        function resetRazorpayPayload() {
-            orderIdEl.value = '';
-            paymentIdEl.value = '';
-            signatureEl.value = '';
+        function currency(amount) {
+            return 'Rs ' + Number(amount || 0).toFixed(2);
         }
 
-        function setStatus(message, className) {
-            razorpayStatusEl.className = className;
-            razorpayStatusEl.textContent = message;
-        }
-
-        function renderFeeStructures(structures) {
-            feeStructureEl.innerHTML = '<option value="">Select Fee</option>';
-
-            structures.forEach(function (structure) {
-                const option = document.createElement('option');
-                option.value = structure.id;
-                option.textContent = structure.fee_category.name + ' - ' + (structure.school_class?.name || '') + ' (Rs ' + Number(structure.amount).toLocaleString() + ')';
-                if (String(structure.id) === String(selectedFeeStructureId)) {
-                    option.selected = true;
-                }
-                feeStructureEl.appendChild(option);
+        function recalculateCollectTotal() {
+            const inputs = feeChartBodyEl.querySelectorAll('input[data-collect-input="1"]');
+            let total = 0;
+            inputs.forEach(function (input) {
+                total += Number(input.value || 0);
             });
+            collectTotalCellEl.textContent = currency(total);
         }
 
-        async function loadStudentFees(studentId) {
+        function getDueInputState() {
+            const allInputs = Array.from(feeChartBodyEl.querySelectorAll('input[data-collect-input="1"]'));
+            const dueInputs = allInputs.filter(function (input) {
+                return !input.disabled && Number(input.max || 0) > 0;
+            });
+            const hasAnyAmount = dueInputs.some(function (input) {
+                return Number(input.value || 0) > 0;
+            });
+
+            return {
+                dueInputs: dueInputs,
+                hasAnyAmount: hasAnyAmount,
+            };
+        }
+
+        async function loadStudentFeesChart(studentId) {
             const response = await fetch('/api/students/' + studentId + '/fees', {
                 headers: {
                     'Accept': 'application/json',
@@ -246,8 +255,69 @@
                 throw new Error('Unable to load fee structures for the selected student.');
             }
 
-            const structures = await response.json();
-            renderFeeStructures(structures);
+            const payload = await response.json();
+            const rows = payload.rows || [];
+            let assignedTotal = 0;
+            let paidTotal = 0;
+            let dueTotal = 0;
+
+            feeChartBodyEl.innerHTML = '';
+
+            if (!rows.length) {
+                feeChartBodyEl.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No assigned fee heads found for this student.</td></tr>';
+            } else {
+                rows.forEach(function (row, index) {
+                    assignedTotal += Number(row.assigned_amount || 0);
+                    paidTotal += Number(row.paid_amount || 0);
+                    dueTotal += Number(row.due_amount || 0);
+
+                    const tr = document.createElement('tr');
+                    const lockedBadge = row.is_locked ? '<span class="badge bg-success">Paid</span>' : '<span class="badge bg-warning text-dark">Due</span>';
+
+                    tr.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td><div class="fw-semibold">${row.fee_head}</div>${lockedBadge}</td>
+                        <td>${currency(row.assigned_amount)}</td>
+                        <td>${currency(row.paid_amount)}</td>
+                        <td class="${Number(row.due_amount) > 0 ? 'text-danger fw-semibold' : 'text-success fw-semibold'}">${currency(row.due_amount)}</td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm"
+                                name="payments[${index}][amount]"
+                                min="0"
+                                max="${Number(row.due_amount).toFixed(2)}"
+                                step="0.01"
+                                value=""
+                                placeholder="${row.is_locked ? 'Locked' : '0.00'}"
+                                data-collect-input="1"
+                                ${row.is_locked ? 'disabled' : ''}>
+                            <input type="hidden" name="payments[${index}][fee_structure_id]" value="${row.id}">
+                        </td>
+                    `;
+
+                    feeChartBodyEl.appendChild(tr);
+                });
+            }
+
+            assignedTotalCellEl.textContent = currency(assignedTotal);
+            paidTotalCellEl.textContent = currency(paidTotal);
+            dueTotalCellEl.textContent = currency(dueTotal);
+            recalculateCollectTotal();
+
+            if (payload.bb_number && !bbNumberEl.value) {
+                bbNumberEl.value = payload.bb_number;
+            }
+
+            feeChartBodyEl.querySelectorAll('input[data-collect-input="1"]').forEach(function (input) {
+                input.addEventListener('input', function () {
+                    input.classList.remove('is-invalid');
+                    const max = Number(input.max || 0);
+                    const val = Number(input.value || 0);
+                    if (val > max) {
+                        input.value = max.toFixed(2);
+                    }
+                    recalculateCollectTotal();
+                });
+            });
         }
 
         function hideStudentResults() {
@@ -264,10 +334,16 @@
                 .filter(Boolean)
                 .join(' | ');
             hideStudentResults();
-            loadStudentFees(student.id).catch(function (error) {
-                feeStructureEl.innerHTML = '<option value="">Select Fee</option>';
+            if (student.bb_number && !bbNumberEl.value) {
+                bbNumberEl.value = student.bb_number;
+            }
+            loadStudentFeesChart(student.id).catch(function (error) {
+                feeChartBodyEl.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-3">Unable to load fee chart.</td></tr>';
                 alert(error.message);
             });
+            if (feeChartContainerEl && typeof feeChartContainerEl.scrollIntoView === 'function') {
+                feeChartContainerEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
         }
 
         function showStudentResults(filteredStudents) {
@@ -278,7 +354,12 @@
                 return;
             }
 
-            filteredStudents.slice(0, 8).forEach(function (student) {
+            const countBadge = document.createElement('div');
+            countBadge.className = 'list-group-item list-group-item-light small text-muted';
+            countBadge.textContent = filteredStudents.length + ' student(s) found';
+            studentResultsEl.appendChild(countBadge);
+
+            filteredStudents.forEach(function (student) {
                 const button = document.createElement('button');
                 button.type = 'button';
                 button.className = 'list-group-item list-group-item-action';
@@ -303,70 +384,17 @@
             });
         }
 
-        function toggleOnlineMode() {
-            const isOnline = paymentChannelEl.value === 'upi';
-
-            onlineGatewayNoticeEl.classList.toggle('d-none', !(isOnline && !razorpayReady));
-            razorpaySectionEl.classList.toggle('d-none', !(isOnline && razorpayReady));
-
-            if (isOnline && razorpayReady) {
-                transactionEl.readOnly = true;
-                transactionEl.placeholder = 'Auto-filled after successful Razorpay payment';
-            } else {
-                transactionEl.readOnly = false;
-                transactionEl.placeholder = '';
-                if (!isOnline) {
-                    resetRazorpayPayload();
-                    setStatus('Awaiting payment.', 'text-muted');
-                }
-            }
-        }
-
-        async function requestRazorpayOrder(amount) {
-            const response = await fetch("{{ route('api.fees.razorpay.order') }}", {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                },
-                body: JSON.stringify({ amount: amount }),
-            });
-
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.message || 'Unable to create Razorpay order.');
-            }
-
-            return data;
-        }
-
-        async function verifyRazorpaySignature(payload) {
-            const response = await fetch("{{ route('api.fees.razorpay.verify') }}", {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                },
-                body: JSON.stringify(payload),
-            });
-
-            const data = await response.json();
-            if (!response.ok || !data.verified) {
-                throw new Error(data.message || 'Payment verification failed.');
-            }
-
-            return true;
-        }
-
         studentSearchEl.addEventListener('input', function () {
             const term = studentSearchEl.value.trim().toLowerCase();
 
             if (!term) {
                 studentIdEl.value = '';
                 selectedStudentCardEl.classList.add('d-none');
-                feeStructureEl.innerHTML = '<option value="">Select Fee</option>';
+                feeChartBodyEl.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Select a student to load fee chart.</td></tr>';
+                assignedTotalCellEl.textContent = currency(0);
+                paidTotalCellEl.textContent = currency(0);
+                dueTotalCellEl.textContent = currency(0);
+                collectTotalCellEl.textContent = currency(0);
                 hideStudentResults();
                 return;
             }
@@ -382,80 +410,6 @@
             }
         });
 
-        if (payWithRazorpayBtn) {
-            payWithRazorpayBtn.addEventListener('click', async function () {
-                const amount = Number(amountEl.value || 0);
-                if (!amount || amount <= 0) {
-                    setStatus('Enter a valid amount before starting online payment.', 'text-danger');
-                    amountEl.focus();
-                    return;
-                }
-
-                if (typeof window.Razorpay === 'undefined') {
-                    setStatus('Razorpay checkout script did not load. Refresh and try again.', 'text-danger');
-                    return;
-                }
-
-                payWithRazorpayBtn.disabled = true;
-                setStatus('Creating Razorpay order...', 'text-primary');
-
-                try {
-                    const order = await requestRazorpayOrder(amount);
-
-                    const options = {
-                        key: order.key_id,
-                        amount: order.amount,
-                        currency: order.currency,
-                        name: order.name,
-                        description: order.description,
-                        order_id: order.order_id,
-                        prefill: {
-                            name: "{{ auth()->user()->name }}",
-                            email: "{{ auth()->user()->email }}",
-                        },
-                        theme: {
-                            color: '#2563eb',
-                        },
-                        handler: async function (response) {
-                            const verifyPayload = {
-                                razorpay_order_id: response.razorpay_order_id,
-                                razorpay_payment_id: response.razorpay_payment_id,
-                                razorpay_signature: response.razorpay_signature,
-                            };
-
-                            await verifyRazorpaySignature(verifyPayload);
-
-                            orderIdEl.value = response.razorpay_order_id;
-                            paymentIdEl.value = response.razorpay_payment_id;
-                            signatureEl.value = response.razorpay_signature;
-                            transactionEl.value = response.razorpay_payment_id;
-                            statusEl.value = 'paid';
-
-                            setStatus('Payment verified. You can record the payment now.', 'text-success');
-                        },
-                        modal: {
-                            ondismiss: function () {
-                                if (!transactionEl.value) {
-                                    setStatus('Payment cancelled by user.', 'text-warning');
-                                }
-                            },
-                        },
-                    };
-
-                    const checkout = new Razorpay(options);
-                    checkout.on('payment.failed', function (response) {
-                        const message = response?.error?.description || 'Payment failed. Please retry.';
-                        setStatus(message, 'text-danger');
-                    });
-                    checkout.open();
-                } catch (error) {
-                    setStatus(error.message || 'Unable to process Razorpay payment.', 'text-danger');
-                } finally {
-                    payWithRazorpayBtn.disabled = false;
-                }
-            });
-        }
-
         form.addEventListener('submit', function (event) {
             if (!studentIdEl.value) {
                 event.preventDefault();
@@ -464,24 +418,38 @@
                 return;
             }
 
-            const isOnline = paymentChannelEl.value === 'upi';
-            if (!isOnline || !razorpayReady) {
-                return;
-            }
-
-            if (!orderIdEl.value || !paymentIdEl.value || !signatureEl.value) {
+            const state = getDueInputState();
+            if (!state.hasAnyAmount) {
                 event.preventDefault();
-                setStatus('Complete Razorpay checkout before recording an online payment.', 'text-danger');
+                if (state.dueInputs.length === 0) {
+                    alert('All fee heads for this student are already paid. Select another student to test collection.');
+                    return;
+                }
+
+                state.dueInputs.forEach(function (input) {
+                    input.classList.add('is-invalid');
+                });
+                alert('Enter amount in at least one due fee head.');
+                state.dueInputs[0].focus();
             }
         });
+
+        function openPrintDialog() {
+            window.print();
+        }
+
+        if (printChartBtn) {
+            printChartBtn.addEventListener('click', openPrintDialog);
+        }
+        if (pdfChartBtn) {
+            pdfChartBtn.addEventListener('click', openPrintDialog);
+        }
+
+        renderPaymentModes();
 
         paymentLocationEl.addEventListener('change', function () {
             renderPaymentModes();
-            toggleOnlineMode();
         });
-        paymentChannelEl.addEventListener('change', toggleOnlineMode);
-        renderPaymentModes();
-        toggleOnlineMode();
 
         if (studentIdEl.value) {
             const selectedStudent = students.find(function (student) {

@@ -13,6 +13,9 @@
         <div class="row mb-4">
             <div class="col-md-6">
                 <p><strong>Receipt No:</strong> {{ $payment->receipt_no }}</p>
+                @if($payment->bb_number)
+                <p><strong>B.B Number:</strong> {{ $payment->bb_number }}</p>
+                @endif
                 <p><strong>Date:</strong> {{ $payment->payment_date->format('M d, Y') }}</p>
                 <p><strong>Payment Location:</strong> {{ ucfirst($payment->payment_location ?: 'school') }}</p>
                 <p><strong>Payment Mode:</strong> {{ ucfirst(str_replace('_', ' ', $payment->payment_channel ?: $payment->payment_method)) }}</p>

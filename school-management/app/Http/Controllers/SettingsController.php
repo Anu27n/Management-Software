@@ -9,6 +9,7 @@ use App\Models\AcademicYear;
 use App\Models\NotificationSetting;
 use App\Models\PaymentGatewaySetting;
 use App\Models\SiteSetting;
+use App\Support\SchoolFeeConfig;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
@@ -102,6 +103,68 @@ class SettingsController extends Controller
         ]);
 
         return redirect()->route('settings.site')->with('success', 'Site settings updated.');
+    }
+
+    public function feeBootstrapDefaults()
+    {
+        $feeConfig = SchoolFeeConfig::resolved();
+        $savedOverrides = SiteSetting::current()->fee_bootstrap_defaults;
+        $usesDatabase = is_array($savedOverrides) && $savedOverrides !== [];
+
+        return view('settings.fee-defaults', compact('feeConfig', 'usesDatabase'));
+    }
+
+    public function updateFeeBootstrapDefaults(Request $request)
+    {
+        $validated = $request->validate([
+            'amounts.misc_annual' => 'required|numeric|min:0|max:9999999',
+            'amounts.admission_one_time' => 'required|numeric|min:0|max:9999999',
+            'tiers' => 'required|array|min:1|max:8',
+            'tiers.*.grade_min' => 'required|integer|min:1|max:12',
+            'tiers.*.grade_max' => 'required|integer|min:1|max:12',
+            'tiers.*.quarterly' => 'required|numeric|min:0|max:9999999',
+            'tiers.*.registration' => 'required|numeric|min:0|max:9999999',
+            'tiers.*.security' => 'required|numeric|min:0|max:9999999',
+        ]);
+
+        foreach ($validated['tiers'] as $i => $tier) {
+            if ((int) $tier['grade_max'] < (int) $tier['grade_min']) {
+                return back()
+                    ->withErrors(['tiers.' . $i . '.grade_max' => 'Grade max must be greater than or equal to grade min.'])
+                    ->withInput();
+            }
+        }
+
+        SiteSetting::current()->update([
+            'fee_bootstrap_defaults' => [
+                'amounts' => [
+                    'misc_annual' => (float) $validated['amounts']['misc_annual'],
+                    'admission_one_time' => (float) $validated['amounts']['admission_one_time'],
+                ],
+                'tiers' => array_map(static function (array $tier): array {
+                    return [
+                        'grade_min' => (int) $tier['grade_min'],
+                        'grade_max' => (int) $tier['grade_max'],
+                        'quarterly' => (float) $tier['quarterly'],
+                        'registration' => (float) $tier['registration'],
+                        'security' => (float) $tier['security'],
+                    ];
+                }, array_values($validated['tiers'])),
+            ],
+        ]);
+
+        return redirect()
+            ->route('settings.fee-defaults')
+            ->with('success', 'Default fee amounts saved. They override config/school_fees.php for new fee bootstrapping until you reset.');
+    }
+
+    public function resetFeeBootstrapDefaults()
+    {
+        SiteSetting::current()->update(['fee_bootstrap_defaults' => null]);
+
+        return redirect()
+            ->route('settings.fee-defaults')
+            ->with('success', 'Reverted to config file defaults (config/school_fees.php).');
     }
 
     private function deriveThemeColorsFromLogo(string $logoPath): array

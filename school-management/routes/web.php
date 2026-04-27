@@ -163,6 +163,10 @@ Route::middleware('auth')->group(function () {
             Route::get('/site', [SettingsController::class, 'siteSettings'])->name('settings.site');
             Route::post('/site', [SettingsController::class, 'updateSiteSettings'])->name('settings.site.update');
 
+            Route::get('/fee-defaults', [SettingsController::class, 'feeBootstrapDefaults'])->name('settings.fee-defaults');
+            Route::post('/fee-defaults', [SettingsController::class, 'updateFeeBootstrapDefaults'])->name('settings.fee-defaults.update');
+            Route::post('/fee-defaults/reset', [SettingsController::class, 'resetFeeBootstrapDefaults'])->name('settings.fee-defaults.reset');
+
             Route::get('/classes', [SettingsController::class, 'classes'])->name('settings.classes');
             Route::post('/classes', [SettingsController::class, 'storeClass'])->name('settings.classes.store');
             Route::delete('/classes/{class}', [SettingsController::class, 'destroyClass'])->name('settings.classes.destroy');

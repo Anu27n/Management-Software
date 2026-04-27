@@ -559,6 +559,9 @@
         <a href="{{ route('settings.site') }}" class="nav-link {{ request()->routeIs('settings.site') ? 'active' : '' }}">
             <i class="bi bi-globe-central-south-asia"></i> Site Settings
         </a>
+        <a href="{{ route('settings.fee-defaults') }}" class="nav-link {{ request()->routeIs('settings.fee-defaults*') ? 'active' : '' }}">
+            <i class="bi bi-currency-rupee"></i> Default fee amounts
+        </a>
         <a href="{{ route('settings.classes') }}" class="nav-link {{ request()->routeIs('settings.classes') ? 'active' : '' }}">
             <i class="bi bi-building"></i> Classes
         </a>
@@ -838,6 +841,9 @@
         @if($canManageSettings)
         <a href="{{ route('settings.site') }}" class="more-menu-item {{ request()->routeIs('settings.site') ? 'active' : '' }}">
             <i class="bi bi-globe-central-south-asia"></i> Site Settings
+        </a>
+        <a href="{{ route('settings.fee-defaults') }}" class="more-menu-item {{ request()->routeIs('settings.fee-defaults*') ? 'active' : '' }}">
+            <i class="bi bi-currency-rupee"></i> Default fee amounts
         </a>
         <a href="{{ route('settings.classes') }}" class="more-menu-item {{ request()->routeIs('settings.classes') ? 'active' : '' }}">
             <i class="bi bi-building"></i> Classes

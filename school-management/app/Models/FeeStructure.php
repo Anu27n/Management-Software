@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FeeStructure extends Model
 {
-    protected $fillable = ['fee_category_id', 'class_id', 'academic_year_id', 'amount', 'frequency', 'due_date'];
+    protected $fillable = ['fee_category_id', 'class_id', 'academic_year_id', 'amount', 'frequency', 'due_date', 'applies_to'];
 
     protected $casts = [
         'amount' => 'decimal:2',

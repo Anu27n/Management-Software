@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\FeePayment;
 use App\Models\FeeStructure;
 use App\Models\Student;
+use App\Support\FeeStructureApplicability;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -340,7 +341,17 @@ class QuickSearchController extends Controller
         $isIntentOnlyDueQuery = preg_match('/\b(fees\s+due|due\s+fees|pending\s+fees)\b/i', $search) === 1;
 
         $studentQuery = Student::query()
-            ->select(['students.id', 'students.first_name', 'students.last_name', 'students.admission_no', 'students.class_id', 'students.academic_year_id', 'students.parent_user_id', 'students.email'])
+            ->select([
+                'students.id',
+                'students.first_name',
+                'students.last_name',
+                'students.admission_no',
+                'students.class_id',
+                'students.academic_year_id',
+                'students.parent_user_id',
+                'students.email',
+                'students.admission_date',
+            ])
             ->leftJoin('classes', 'classes.id', '=', 'students.class_id')
             ->leftJoin('sections', 'sections.id', '=', 'students.section_id')
             ->where('students.status', 'active');
@@ -376,6 +387,8 @@ class QuickSearchController extends Controller
         if ($students->isEmpty()) {
             return collect();
         }
+
+        $students->load('academicYear');
 
         $classYearKeys = $students->map(fn ($s) => $s->class_id . '-' . $s->academic_year_id)->unique();
         $validClassYearPairs = $classYearKeys
@@ -419,6 +432,10 @@ class QuickSearchController extends Controller
             $items = $structures->get($student->class_id . '-' . $student->academic_year_id, collect());
 
             foreach ($items as $structure) {
+                if (!FeeStructureApplicability::appliesToStudent($structure, $student)) {
+                    continue;
+                }
+
                 $assigned = (float) $structure->amount;
                 $paid = (float) ($paymentMap[$student->id . '-' . $structure->id] ?? 0);
                 $totalDue += max(0, $assigned - $paid);

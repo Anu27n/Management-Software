@@ -19,7 +19,7 @@
     <table>
         <thead>
             <tr>
-                <th>#</th><th>Receipt</th><th>Student</th><th>Category</th>
+                <th>#</th><th>Receipt</th><th>B.B No</th><th>Student</th><th>Category</th>
                 <th>Amount</th><th>Discount</th><th>Fine</th><th>Date</th><th>Method</th><th>Status</th>
             </tr>
         </thead>
@@ -30,6 +30,7 @@
             <tr>
                 <td>{{ $i+1 }}</td>
                 <td>{{ $p->receipt_no }}</td>
+                <td>{{ $p->bb_number ?? '-' }}</td>
                 <td>{{ $p->student->full_name ?? '-' }}</td>
                 <td>{{ $p->feeStructure->feeCategory->name ?? '-' }}</td>
                 <td class="text-right">{{ number_format($p->amount_paid, 2) }}</td>
@@ -42,7 +43,7 @@
             @endforeach
         </tbody>
         <tfoot>
-            <tr><td colspan="4"><strong>Total</strong></td><td class="text-right"><strong>{{ number_format($total, 2) }}</strong></td><td colspan="5"></td></tr>
+            <tr><td colspan="5"><strong>Total</strong></td><td class="text-right"><strong>{{ number_format($total, 2) }}</strong></td><td colspan="5"></td></tr>
         </tfoot>
     </table>
 </body>

@@ -40,6 +40,8 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
+        $this->call(SchoolFeeStructureSeeder::class);
+
         $targetUserCount = 100;
         $remainingUsers = max(0, $targetUserCount - User::query()->count());
 

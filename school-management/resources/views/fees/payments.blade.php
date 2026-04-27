@@ -67,11 +67,12 @@
 <div class="card table-card">
     <div class="table-responsive">
         <table class="table table-hover mb-0">
-            <thead class="table-light"><tr><th>Receipt</th><th>Student</th><th>Category</th><th>Amount</th><th>Location</th><th>Mode</th><th>Date</th><th>Status</th><th></th></tr></thead>
+            <thead class="table-light"><tr><th>Receipt</th><th>B.B No</th><th>Student</th><th>Category</th><th>Amount</th><th>Location</th><th>Mode</th><th>Date</th><th>Status</th><th></th></tr></thead>
             <tbody>
                 @forelse($payments as $p)
                 <tr>
                     <td class="fw-semibold">{{ $p->receipt_no }}</td>
+                    <td>{{ $p->bb_number ?: '-' }}</td>
                     <td>{{ $p->student->full_name }}</td>
                     <td>{{ $p->feeStructure->feeCategory->name ?? '-' }}</td>
                     <td>₹{{ number_format($p->amount_paid) }}</td>
@@ -82,7 +83,7 @@
                     <td><a href="{{ route('fees.payments.show', $p) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-eye"></i></a></td>
                 </tr>
                 @empty
-                <tr><td colspan="9" class="text-center text-muted py-3">No payments</td></tr>
+                <tr><td colspan="10" class="text-center text-muted py-3">No payments</td></tr>
                 @endforelse
             </tbody>
         </table>

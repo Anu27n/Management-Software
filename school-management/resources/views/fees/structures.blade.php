@@ -45,7 +45,7 @@
                         </div>
                         <div class="col-6">
                             <label class="form-label">Frequency <span class="text-danger">*</span></label>
-                            <select name="frequency" class="form-select" required>
+                            <select name="frequency" id="frequency_select" class="form-select" required>
                                 <option value="monthly">Monthly</option>
                                 <option value="quarterly">Quarterly</option>
                                 <option value="half_yearly">Half Yearly</option>
@@ -54,9 +54,17 @@
                             </select>
                         </div>
                     </div>
-                    <div class="mb-3">
+                    <div class="alert alert-light border py-2 small d-none mb-3" id="quarterly_note" role="status">
+                        One row per quarter will be created for this session, each due on the <strong>15th</strong> of April, July, October, or January when that date falls inside the academic year.
+                    </div>
+                    <div class="mb-3" id="due_date_row">
                         <label class="form-label">Due Date</label>
-                        <input type="date" name="due_date" class="form-control">
+                        <input type="date" name="due_date" class="form-control" id="due_date_input">
+                        <div class="form-text text-muted" id="due_date_help">Optional.</div>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" name="new_admission_only" value="1" id="new_admission_only">
+                        <label class="form-check-label" for="new_admission_only">New admission only (admission date in this academic year)</label>
                     </div>
                     <button class="btn btn-primary w-100">Add Structure</button>
                 </form>
@@ -74,7 +82,7 @@
             </div>
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
-                    <thead class="table-light"><tr><th>Category</th><th>Class</th><th>Amount</th><th>Frequency</th><th>Due</th><th></th></tr></thead>
+                    <thead class="table-light"><tr><th>Category</th><th>Class</th><th>Amount</th><th>Frequency</th><th>Applies</th><th>Due</th><th></th></tr></thead>
                     <tbody>
                         @forelse($structures as $s)
                         <tr>
@@ -82,6 +90,13 @@
                             <td>{{ $s->schoolClass->name }}</td>
                             <td class="fw-semibold">₹{{ number_format($s->amount) }}</td>
                             <td>{{ ucfirst(str_replace('_', ' ', $s->frequency)) }}</td>
+                            <td>
+                                @if(($s->applies_to ?? 'all_students') === 'new_admission_only')
+                                    <span class="badge text-bg-info">New admission</span>
+                                @else
+                                    <span class="text-muted">All</span>
+                                @endif
+                            </td>
                             <td>{{ $s->due_date?->format('M d, Y') ?? '-' }}</td>
                             <td>
                                 <form action="{{ route('fees.structures.destroy', $s) }}" method="POST" onsubmit="return confirm('Delete?')">
@@ -91,7 +106,7 @@
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="6" class="text-center text-muted py-3">No structures</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted py-3">No structures</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -103,3 +118,22 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    const freq = document.getElementById('frequency_select');
+    const dueRow = document.getElementById('due_date_row');
+    const dueInput = document.getElementById('due_date_input');
+    const quarterlyNote = document.getElementById('quarterly_note');
+    function sync() {
+        const isQuarterly = freq && freq.value === 'quarterly';
+        if (quarterlyNote) quarterlyNote.classList.toggle('d-none', !isQuarterly);
+        if (dueRow) dueRow.style.display = isQuarterly ? 'none' : '';
+        if (dueInput) dueInput.disabled = isQuarterly;
+    }
+    if (freq) freq.addEventListener('change', sync);
+    sync();
+})();
+</script>
+@endpush
