@@ -3,6 +3,10 @@
 @section('page-title', 'Fee Payments')
 
 @section('content')
+@php
+    $canEditPayments = auth()->user()->hasPermission('fees.payments.edit');
+    $canDeletePayments = auth()->user()->hasPermission('fees.payments.delete');
+@endphp
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
     <div>
         @if(auth()->user()->hasPermission('fees.manage'))
@@ -15,6 +19,7 @@
     </div>
     <div class="d-flex gap-2">
         <a href="{{ route('fees.discounts') }}" class="btn btn-outline-info btn-sm"><i class="bi bi-percent me-1"></i>Discount Records</a>
+        <a href="{{ route('fees.discount-presets') }}" class="btn btn-outline-info btn-sm"><i class="bi bi-tags me-1"></i>Discount Options</a>
         <a href="{{ route('fees.due') }}" class="btn btn-outline-warning btn-sm"><i class="bi bi-exclamation-circle me-1"></i>Due Fees</a>
         <a href="{{ route('fees.previous-dues') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-clock-history me-1"></i>Previous Session Dues</a>
         <div class="btn-group btn-group-sm">
@@ -74,13 +79,27 @@
                     <td class="fw-semibold">{{ $p->receipt_no }}</td>
                     <td>{{ $p->bb_number ?: '-' }}</td>
                     <td>{{ $p->student->full_name }}</td>
-                    <td>{{ $p->feeStructure->feeCategory->name ?? '-' }}</td>
+                    <td>{{ $p->feeStructure->display_name ?? '-' }}</td>
                     <td>₹{{ number_format($p->amount_paid) }}</td>
                     <td>{{ ucfirst($p->payment_location ?: 'school') }}</td>
                     <td>{{ ucfirst(str_replace('_', ' ', $p->payment_channel ?: $p->payment_method)) }}</td>
                     <td>{{ $p->payment_date->format('M d, Y') }}</td>
                     <td><span class="badge bg-{{ $p->status == 'paid' ? 'success' : ($p->status == 'partial' ? 'warning' : 'danger') }}">{{ $p->status == 'paid' ? 'Fully Paid' : ($p->status == 'partial' ? 'Partially Paid' : 'Pending') }}</span></td>
-                    <td><a href="{{ route('fees.payments.show', $p) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-eye"></i></a></td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <a href="{{ route('fees.payments.show', $p) }}" class="btn btn-outline-primary" title="View"><i class="bi bi-eye"></i></a>
+                            @if($canEditPayments)
+                                <a href="{{ route('fees.payments.edit', $p) }}" class="btn btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
+                            @endif
+                            @if($canDeletePayments)
+                                <form action="{{ route('fees.payments.destroy', $p) }}" method="POST" onsubmit="return confirm('Delete this fee payment record? This will also remove its discount record.')" class="d-inline">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button class="btn btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
+                                </form>
+                            @endif
+                        </div>
+                    </td>
                 </tr>
                 @empty
                 <tr><td colspan="10" class="text-center text-muted py-3">No payments</td></tr>

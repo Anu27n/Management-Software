@@ -29,7 +29,7 @@ final class FeeStructureApplicability
         }
 
         $admission = $student->admission_date->copy()->startOfDay();
-        $start = $year->start_date->copy()->startOfDay();
+        $start = $year->start_date->copy()->startOfYear()->startOfDay();
         $end = $year->end_date->copy()->startOfDay();
 
         return $admission->greaterThanOrEqualTo($start) && $admission->lessThanOrEqualTo($end);

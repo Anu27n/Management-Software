@@ -64,7 +64,7 @@
                     </div>
                     <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox" name="new_admission_only" value="1" id="new_admission_only">
-                        <label class="form-check-label" for="new_admission_only">New admission only (admission date in this academic year)</label>
+                        <label class="form-check-label" for="new_admission_only">New admission only (admission date from January through this academic year)</label>
                     </div>
                     <button class="btn btn-primary w-100">Add Structure</button>
                 </form>
@@ -77,6 +77,7 @@
                 <h6 class="mb-0 fw-semibold">All Structures</h6>
                 <div class="btn-group btn-group-sm">
                     <a href="{{ route('fees.categories') }}" class="btn btn-outline-primary">Categories</a>
+                    <a href="{{ route('fees.discount-presets') }}" class="btn btn-outline-info">Discount Options</a>
                     <a href="{{ route('fees.payments') }}" class="btn btn-outline-primary">Payments</a>
                 </div>
             </div>
@@ -86,7 +87,7 @@
                     <tbody>
                         @forelse($structures as $s)
                         <tr>
-                            <td>{{ $s->feeCategory->name }}</td>
+                            <td>{{ $s->display_name }}</td>
                             <td>{{ $s->schoolClass->name }}</td>
                             <td class="fw-semibold">₹{{ number_format($s->amount) }}</td>
                             <td>{{ ucfirst(str_replace('_', ' ', $s->frequency)) }}</td>

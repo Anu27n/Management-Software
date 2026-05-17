@@ -227,7 +227,7 @@
                         @forelse($student->feePayments as $payment)
                         <tr>
                             <td>{{ $payment->receipt_no }}</td>
-                            <td>{{ $payment->feeStructure->feeCategory->name ?? '-' }}</td>
+                            <td>{{ $payment->feeStructure->display_name ?? '-' }}</td>
                             <td>Rs {{ number_format((float) $payment->amount_paid, 2) }}</td>
                             <td>{{ $payment->payment_date->format('M d, Y') }}</td>
                             <td><span class="badge bg-{{ $payment->status == 'paid' ? 'success' : 'warning' }}">{{ ucfirst($payment->status) }}</span></td>

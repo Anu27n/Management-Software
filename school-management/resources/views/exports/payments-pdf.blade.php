@@ -32,7 +32,7 @@
                 <td>{{ $p->receipt_no }}</td>
                 <td>{{ $p->bb_number ?? '-' }}</td>
                 <td>{{ $p->student->full_name ?? '-' }}</td>
-                <td>{{ $p->feeStructure->feeCategory->name ?? '-' }}</td>
+                <td>{{ $p->feeStructure->display_name ?? '-' }}</td>
                 <td class="text-right">{{ number_format($p->amount_paid, 2) }}</td>
                 <td class="text-right">{{ number_format($p->discount, 2) }}</td>
                 <td class="text-right">{{ number_format($p->fine, 2) }}</td>

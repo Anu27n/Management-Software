@@ -3,6 +3,10 @@
 @section('page-title', 'Payment Receipt')
 
 @section('content')
+@php
+    $canEditPayments = auth()->user()->hasPermission('fees.payments.edit');
+    $canDeletePayments = auth()->user()->hasPermission('fees.payments.delete');
+@endphp
 <div class="card table-card" id="receipt">
     <div class="card-body">
         <div class="text-center mb-4">
@@ -32,7 +36,7 @@
             <div class="col-md-6">
                 <p><strong>Student:</strong> {{ $payment->student->full_name }}</p>
                 <p><strong>Admission No:</strong> {{ $payment->student->admission_no }}</p>
-                <p><strong>Fee Category:</strong> {{ $payment->feeStructure->feeCategory->name ?? '-' }}</p>
+                <p><strong>Fee Category:</strong> {{ $payment->feeStructure->display_name ?? '-' }}</p>
             </div>
         </div>
         <table class="table table-bordered">
@@ -50,6 +54,16 @@
 </div>
 <div class="mt-3 d-flex gap-2">
     <button onclick="window.print()" class="btn btn-primary"><i class="bi bi-printer me-1"></i>Print</button>
+    @if($canEditPayments)
+        <a href="{{ route('fees.payments.edit', $payment) }}" class="btn btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit</a>
+    @endif
+    @if($canDeletePayments)
+        <form action="{{ route('fees.payments.destroy', $payment) }}" method="POST" onsubmit="return confirm('Delete this fee payment record? This will also remove its discount record.')" class="m-0">
+            @csrf
+            @method('DELETE')
+            <button class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i>Delete</button>
+        </form>
+    @endif
     <a href="{{ route('fees.payments') }}" class="btn btn-secondary">Back</a>
 </div>
 @endsection

@@ -66,7 +66,7 @@
                     <tr>
                         <td class="fw-semibold">{{ $item['student']->full_name }}</td>
                         <td>{{ $item['student']->schoolClass?->name ?? '-' }}</td>
-                        <td>{{ $item['fee_head'] ?? ($item['structure']->feeCategory?->name ?? '-') }}</td>
+                        <td>{{ $item['fee_head'] ?? ($item['structure']->display_name ?? '-') }}</td>
                         <td>Rs {{ number_format($item['total_amount'] ?? ($item['structure']->amount ?? 0), 2) }}</td>
                         <td>Rs {{ number_format($item['paid_amount'], 2) }}</td>
                         <td class="{{ $item['due_amount'] > 0 ? 'text-danger fw-semibold' : 'text-success fw-semibold' }}">
@@ -80,7 +80,7 @@
                                     data-student-id="{{ $item['student']->id }}"
                                     data-student-name="{{ $item['student']->full_name }}"
                                     data-fee-structure-id="{{ $item['structure']->id }}"
-                                    data-fee-name="{{ $item['structure']->feeCategory?->name ?? 'Fee' }}"
+                                    data-fee-name="{{ $item['structure']->display_name ?? 'Fee' }}"
                                     data-due-amount="{{ $item['due_amount'] }}"
                                     {{ $razorpayReady ? '' : 'disabled' }}
                                 >
@@ -130,7 +130,7 @@
                     <tr>
                         <td class="fw-semibold">{{ $payment->receipt_no }}</td>
                         <td>{{ $payment->student?->full_name ?? '-' }}</td>
-                        <td>{{ $payment->feeStructure?->feeCategory?->name ?? '-' }}</td>
+                        <td>{{ $payment->feeStructure?->display_name ?? '-' }}</td>
                         <td>Rs {{ number_format($payment->amount_paid, 2) }}</td>
                         <td>{{ $payment->payment_date?->format('d M Y') }}</td>
                         <td>

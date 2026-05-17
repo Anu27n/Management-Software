@@ -132,6 +132,13 @@ Route::middleware('auth')->group(function () {
         Route::delete('/fees/structures/{structure}', [FeeController::class, 'destroyStructure'])->name('fees.structures.destroy');
     });
 
+    Route::middleware('permission:fees.manage,fees.setup.manage,fees.payments.manage,fees.quick-entry.manage')->group(function () {
+        Route::get('/fees/discount-presets', [FeeController::class, 'discountPresets'])->name('fees.discount-presets');
+        Route::post('/fees/discount-presets', [FeeController::class, 'storeDiscountPreset'])->name('fees.discount-presets.store');
+        Route::put('/fees/discount-presets/{preset}', [FeeController::class, 'updateDiscountPreset'])->name('fees.discount-presets.update');
+        Route::delete('/fees/discount-presets/{preset}', [FeeController::class, 'destroyDiscountPreset'])->name('fees.discount-presets.destroy');
+    });
+
     Route::middleware('permission:fees.payments.manage,fees.quick-entry.manage')->group(function () {
         Route::get('/fees/payments', [FeeController::class, 'payments'])->name('fees.payments');
         Route::get('/fees/discounts', [FeeController::class, 'discounts'])->name('fees.discounts');
@@ -141,6 +148,15 @@ Route::middleware('auth')->group(function () {
         Route::post('/fees/previous-session-dues/{previousDue}/settle', [FeeController::class, 'settlePreviousSessionDue'])->name('fees.previous-dues.settle');
         Route::get('/fees/payments/create', [FeeController::class, 'createPayment'])->name('fees.payments.create');
         Route::post('/fees/payments', [FeeController::class, 'storePayment'])->name('fees.payments.store');
+        Route::get('/fees/payments/{payment}/edit', [FeeController::class, 'editPayment'])
+            ->middleware('permission:fees.payments.edit')
+            ->name('fees.payments.edit');
+        Route::put('/fees/payments/{payment}', [FeeController::class, 'updatePayment'])
+            ->middleware('permission:fees.payments.edit')
+            ->name('fees.payments.update');
+        Route::delete('/fees/payments/{payment}', [FeeController::class, 'destroyPayment'])
+            ->middleware('permission:fees.payments.delete')
+            ->name('fees.payments.destroy');
         Route::get('/fees/payments/{payment}', [FeeController::class, 'showPayment'])->name('fees.payments.show');
         Route::get('/api/students/{student}/fees', [FeeController::class, 'getStudentFees'])->name('api.student-fees');
         Route::post('/api/fees/razorpay/order', [FeeController::class, 'createRazorpayOrder'])->name('api.fees.razorpay.order');

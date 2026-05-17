@@ -29,6 +29,7 @@
                 <h6 class="mb-0 fw-semibold">All Categories</h6>
                 <div class="btn-group btn-group-sm">
                     <a href="{{ route('fees.structures') }}" class="btn btn-outline-primary">Structures</a>
+                    <a href="{{ route('fees.discount-presets') }}" class="btn btn-outline-info">Discount Options</a>
                     <a href="{{ route('fees.payments') }}" class="btn btn-outline-primary">Payments</a>
                 </div>
             </div>

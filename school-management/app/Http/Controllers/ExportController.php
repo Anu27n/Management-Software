@@ -51,7 +51,7 @@ class ExportController extends Controller
             return [
                 $p->receipt_no,
                 $p->student->full_name ?? '',
-                $p->feeStructure->feeCategory->name ?? '',
+                $p->feeStructure->display_name ?? '',
                 $p->amount_paid, $p->discount, $p->fine,
                 $p->payment_date?->format('Y-m-d'),
                 $p->payment_method, $p->status,

@@ -329,7 +329,7 @@ class QuickSearchController extends Controller
                 return [
                     'id' => $payment->id,
                     'title' => $payment->receipt_no,
-                    'subtitle' => ($payment->student?->full_name ?? 'Unknown Student') . ' | ' . ($payment->feeStructure?->feeCategory?->name ?? 'Fee'),
+                    'subtitle' => ($payment->student?->full_name ?? 'Unknown Student') . ' | ' . ($payment->feeStructure?->display_name ?? 'Fee'),
                     'meta' => 'Rs ' . number_format((float) $payment->amount_paid, 2) . ' | ' . optional($payment->payment_date)->format('d M Y') . ' | ' . ucfirst($payment->status),
                     'url' => $this->feeRecordUrl($user, $payment),
                 ];
@@ -419,12 +419,12 @@ class QuickSearchController extends Controller
             ->groupBy(fn ($item) => $item->class_id . '-' . $item->academic_year_id);
 
         $paymentMap = FeePayment::query()
-            ->select('student_id', 'fee_structure_id', DB::raw('SUM(amount_paid) as total_paid'))
+            ->select('student_id', 'fee_structure_id', DB::raw('SUM(amount_paid + discount) as total_settled'))
             ->whereIn('student_id', $students->pluck('id'))
             ->groupBy('student_id', 'fee_structure_id')
             ->get()
             ->mapWithKeys(function ($payment) {
-                return [$payment->student_id . '-' . $payment->fee_structure_id => (float) $payment->total_paid];
+                return [$payment->student_id . '-' . $payment->fee_structure_id => (float) $payment->total_settled];
             });
 
         return $students->map(function ($student) use ($structures, $paymentMap, $user) {
@@ -519,4 +519,3 @@ class QuickSearchController extends Controller
         return route('fees.my-fees');
     }
 }
-

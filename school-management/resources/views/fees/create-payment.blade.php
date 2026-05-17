@@ -25,6 +25,14 @@
             $student->profile?->fee_booklet_number,
         ]))),
     ])->values();
+    $discountPresetPayload = $discountPresets->map(fn ($preset) => [
+        'id' => $preset->id,
+        'name' => $preset->name,
+        'fee_category_id' => $preset->fee_category_id,
+        'discount_type' => $preset->discount_type,
+        'value' => (float) $preset->value,
+        'label' => $preset->name . ' (' . ($preset->discount_type === 'percentage' ? rtrim(rtrim(number_format((float) $preset->value, 2), '0'), '.') . '%' : 'Rs ' . number_format((float) $preset->value, 2)) . ')',
+    ])->values();
 @endphp
 
 <div class="card table-card">
@@ -61,10 +69,7 @@
                     <label class="form-label">Payment Date <span class="text-danger">*</span></label>
                     <input type="date" name="payment_date" class="form-control" value="{{ old('payment_date', date('Y-m-d')) }}" required>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">Discount (Rs)</label>
-                    <input type="number" name="discount" class="form-control" step="0.01" value="{{ old('discount', 0) }}">
-                </div>
+                <input type="hidden" name="discount" value="{{ old('discount', 0) }}">
                 <div class="col-md-3">
                     <label class="form-label">Fine (Rs)</label>
                     <input type="number" name="fine" class="form-control" step="0.01" value="{{ old('fine', 0) }}">
@@ -116,13 +121,15 @@
                                     <th>Fee Head</th>
                                     <th style="width: 140px;">Assigned</th>
                                     <th style="width: 140px;">Paid</th>
+                                    <th style="width: 140px;">Discounted</th>
                                     <th style="width: 140px;">Due</th>
+                                    <th style="width: 260px;">Discount Now</th>
                                     <th style="width: 220px;">Collect Now</th>
                                 </tr>
                             </thead>
                             <tbody id="feeChartBody">
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-3">Select a student to load fee chart.</td>
+                                    <td colspan="8" class="text-center text-muted py-3">Select a student to load fee chart.</td>
                                 </tr>
                             </tbody>
                             <tfoot class="table-light">
@@ -130,7 +137,9 @@
                                     <th colspan="2">Total</th>
                                     <th id="assignedTotalCell">Rs 0.00</th>
                                     <th id="paidTotalCell">Rs 0.00</th>
+                                    <th id="discountTotalCell">Rs 0.00</th>
                                     <th id="dueTotalCell">Rs 0.00</th>
+                                    <th id="discountNowTotalCell">Rs 0.00</th>
                                     <th id="collectTotalCell">Rs 0.00</th>
                                 </tr>
                             </tfoot>
@@ -195,12 +204,15 @@
         const feeChartBodyEl = document.getElementById('feeChartBody');
         const assignedTotalCellEl = document.getElementById('assignedTotalCell');
         const paidTotalCellEl = document.getElementById('paidTotalCell');
+        const discountTotalCellEl = document.getElementById('discountTotalCell');
         const dueTotalCellEl = document.getElementById('dueTotalCell');
+        const discountNowTotalCellEl = document.getElementById('discountNowTotalCell');
         const collectTotalCellEl = document.getElementById('collectTotalCell');
         const printChartBtn = document.getElementById('printChartBtn');
         const pdfChartBtn = document.getElementById('pdfChartBtn');
         const feeChartContainerEl = document.getElementById('feeChartContainer');
         const students = @json($studentPayload);
+        const discountPresets = @json($discountPresetPayload);
         const locationModeMap = {
             school: [
                 { value: 'cash', label: 'Cash' },
@@ -219,21 +231,37 @@
             return 'Rs ' + Number(amount || 0).toFixed(2);
         }
 
+        function escapeHtml(value) {
+            const div = document.createElement('div');
+            div.textContent = value == null ? '' : String(value);
+            return div.innerHTML;
+        }
+
         function recalculateCollectTotal() {
             const inputs = feeChartBodyEl.querySelectorAll('input[data-collect-input="1"]');
+            const discountInputs = feeChartBodyEl.querySelectorAll('input[data-discount-input="1"]');
             let total = 0;
+            let discountTotal = 0;
             inputs.forEach(function (input) {
                 total += Number(input.value || 0);
             });
+            discountInputs.forEach(function (input) {
+                discountTotal += Number(input.value || 0);
+            });
             collectTotalCellEl.textContent = currency(total);
+            discountNowTotalCellEl.textContent = currency(discountTotal);
         }
 
         function getDueInputState() {
             const allInputs = Array.from(feeChartBodyEl.querySelectorAll('input[data-collect-input="1"]'));
+            const allDiscountInputs = Array.from(feeChartBodyEl.querySelectorAll('input[data-discount-input="1"]'));
             const dueInputs = allInputs.filter(function (input) {
                 return !input.disabled && Number(input.max || 0) > 0;
             });
-            const hasAnyAmount = dueInputs.some(function (input) {
+            const dueDiscountInputs = allDiscountInputs.filter(function (input) {
+                return !input.disabled && Number(input.max || 0) > 0;
+            });
+            const hasAnyAmount = dueInputs.concat(dueDiscountInputs).some(function (input) {
                 return Number(input.value || 0) > 0;
             });
 
@@ -259,27 +287,54 @@
             const rows = payload.rows || [];
             let assignedTotal = 0;
             let paidTotal = 0;
+            let discountTotal = 0;
             let dueTotal = 0;
 
             feeChartBodyEl.innerHTML = '';
 
             if (!rows.length) {
-                feeChartBodyEl.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No assigned fee heads found for this student.</td></tr>';
+                feeChartBodyEl.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No assigned fee heads found for this student.</td></tr>';
             } else {
                 rows.forEach(function (row, index) {
                     assignedTotal += Number(row.assigned_amount || 0);
                     paidTotal += Number(row.paid_amount || 0);
+                    discountTotal += Number(row.discount_amount || 0);
                     dueTotal += Number(row.due_amount || 0);
 
                     const tr = document.createElement('tr');
                     const lockedBadge = row.is_locked ? '<span class="badge bg-success">Paid</span>' : '<span class="badge bg-warning text-dark">Due</span>';
+                    const matchingPresets = discountPresets.filter(function (preset) {
+                        return !preset.fee_category_id || String(preset.fee_category_id) === String(row.fee_category_id);
+                    });
+                    const presetOptions = matchingPresets.map(function (preset) {
+                        return `<option value="${preset.id}" data-type="${escapeHtml(preset.discount_type)}" data-value="${Number(preset.value || 0)}">${escapeHtml(preset.label)}</option>`;
+                    }).join('');
 
                     tr.innerHTML = `
                         <td>${index + 1}</td>
-                        <td><div class="fw-semibold">${row.fee_head}</div>${lockedBadge}</td>
+                        <td><div class="fw-semibold">${escapeHtml(row.fee_head)}</div>${lockedBadge}</td>
                         <td>${currency(row.assigned_amount)}</td>
                         <td>${currency(row.paid_amount)}</td>
+                        <td class="text-success fw-semibold">${currency(row.discount_amount)}</td>
                         <td class="${Number(row.due_amount) > 0 ? 'text-danger fw-semibold' : 'text-success fw-semibold'}">${currency(row.due_amount)}</td>
+                        <td>
+                            <div class="input-group input-group-sm mb-1">
+                                <select class="form-select" name="payments[${index}][discount_preset_id]" data-discount-preset="1" ${row.is_locked ? 'disabled' : ''}>
+                                    <option value="">Manual</option>
+                                    ${presetOptions}
+                                </select>
+                            </div>
+                            <input type="number" class="form-control form-control-sm"
+                                name="payments[${index}][discount]"
+                                min="0"
+                                max="${Number(row.due_amount).toFixed(2)}"
+                                step="0.01"
+                                value=""
+                                placeholder="${row.is_locked ? 'Locked' : '0.00'}"
+                                data-discount-input="1"
+                                data-due-amount="${Number(row.due_amount).toFixed(2)}"
+                                ${row.is_locked ? 'disabled' : ''}>
+                        </td>
                         <td>
                             <input type="number" class="form-control form-control-sm"
                                 name="payments[${index}][amount]"
@@ -300,6 +355,7 @@
 
             assignedTotalCellEl.textContent = currency(assignedTotal);
             paidTotalCellEl.textContent = currency(paidTotal);
+            discountTotalCellEl.textContent = currency(discountTotal);
             dueTotalCellEl.textContent = currency(dueTotal);
             recalculateCollectTotal();
 
@@ -307,14 +363,41 @@
                 bbNumberEl.value = payload.bb_number;
             }
 
-            feeChartBodyEl.querySelectorAll('input[data-collect-input="1"]').forEach(function (input) {
+            feeChartBodyEl.querySelectorAll('input[data-collect-input="1"], input[data-discount-input="1"]').forEach(function (input) {
                 input.addEventListener('input', function () {
                     input.classList.remove('is-invalid');
-                    const max = Number(input.max || 0);
+                    const rowEl = input.closest('tr');
+                    const collectInput = rowEl ? rowEl.querySelector('input[data-collect-input="1"]') : null;
+                    const discountInput = rowEl ? rowEl.querySelector('input[data-discount-input="1"]') : null;
+                    const due = Number((discountInput && discountInput.dataset.dueAmount) || input.max || 0);
+                    const other = input === collectInput ? Number(discountInput.value || 0) : Number(collectInput.value || 0);
+                    const max = Math.max(0, due - other);
                     const val = Number(input.value || 0);
                     if (val > max) {
                         input.value = max.toFixed(2);
                     }
+                    recalculateCollectTotal();
+                });
+            });
+
+            feeChartBodyEl.querySelectorAll('select[data-discount-preset="1"]').forEach(function (select) {
+                select.addEventListener('change', function () {
+                    const selected = select.options[select.selectedIndex];
+                    const rowEl = select.closest('tr');
+                    const discountInput = rowEl ? rowEl.querySelector('input[data-discount-input="1"]') : null;
+                    const collectInput = rowEl ? rowEl.querySelector('input[data-collect-input="1"]') : null;
+                    if (!discountInput || !selected || !selected.value) {
+                        return;
+                    }
+
+                    const due = Number(discountInput.dataset.dueAmount || 0);
+                    const currentCollect = Number(collectInput.value || 0);
+                    const available = Math.max(0, due - currentCollect);
+                    const presetType = selected.dataset.type;
+                    const presetValue = Number(selected.dataset.value || 0);
+                    const discount = presetType === 'percentage' ? (due * presetValue / 100) : presetValue;
+
+                    discountInput.value = Math.min(available, discount).toFixed(2);
                     recalculateCollectTotal();
                 });
             });
@@ -390,10 +473,12 @@
             if (!term) {
                 studentIdEl.value = '';
                 selectedStudentCardEl.classList.add('d-none');
-                feeChartBodyEl.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Select a student to load fee chart.</td></tr>';
+                feeChartBodyEl.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Select a student to load fee chart.</td></tr>';
                 assignedTotalCellEl.textContent = currency(0);
                 paidTotalCellEl.textContent = currency(0);
+                discountTotalCellEl.textContent = currency(0);
                 dueTotalCellEl.textContent = currency(0);
+                discountNowTotalCellEl.textContent = currency(0);
                 collectTotalCellEl.textContent = currency(0);
                 hideStudentResults();
                 return;
@@ -429,7 +514,7 @@
                 state.dueInputs.forEach(function (input) {
                     input.classList.add('is-invalid');
                 });
-                alert('Enter amount in at least one due fee head.');
+                alert('Enter payment or discount in at least one due fee head.');
                 state.dueInputs[0].focus();
             }
         });

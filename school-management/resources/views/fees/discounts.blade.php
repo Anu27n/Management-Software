@@ -7,6 +7,7 @@
     <div class="btn-group btn-group-sm">
         <a href="{{ route('fees.payments') }}" class="btn btn-outline-primary">Payments</a>
         <a href="{{ route('fees.due') }}" class="btn btn-outline-warning">Due Fees</a>
+        <a href="{{ route('fees.discount-presets') }}" class="btn btn-outline-info">Discount Options</a>
     </div>
     <a href="{{ route('fees.payments.create') }}" class="btn btn-primary btn-sm"><i class="bi bi-lightning-charge me-1"></i>Quick Record</a>
 </div>
@@ -75,7 +76,7 @@
                             <div class="fw-semibold">{{ $discount->student?->full_name ?? '-' }}</div>
                             <small class="text-muted">{{ $discount->student?->admission_no ?? '-' }}</small>
                         </td>
-                        <td>{{ $discount->feeStructure?->feeCategory?->name ?? '-' }}</td>
+                        <td>{{ $discount->feeStructure?->display_name ?? '-' }}</td>
                         <td>{{ $discount->payment?->receipt_no ?? '-' }}</td>
                         <td class="text-success fw-semibold">Rs {{ number_format((float) $discount->discount_amount, 2) }}</td>
                         <td>{{ number_format((float) $discount->discount_percentage, 2) }}%</td>

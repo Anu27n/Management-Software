@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\FeeCategory;
+use App\Models\FeeDiscountPreset;
 use App\Models\FeeDiscountRecord;
 use App\Models\FeeStructure;
 use App\Models\FeePayment;
@@ -212,6 +213,63 @@ class FeeController extends Controller
         return view('fees.discounts', compact('discounts', 'summary'));
     }
 
+    public function discountPresets()
+    {
+        $presets = FeeDiscountPreset::with('feeCategory:id,name')
+            ->latest()
+            ->paginate(20);
+        $categories = FeeCategory::orderBy('name')->get();
+
+        return view('fees.discount-presets', compact('presets', 'categories'));
+    }
+
+    public function storeDiscountPreset(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'fee_category_id' => 'nullable|exists:fee_categories,id',
+            'discount_type' => 'required|in:fixed,percentage',
+            'value' => 'required|numeric|min:0.01',
+            'is_active' => 'sometimes|boolean',
+        ]);
+
+        if ($validated['discount_type'] === 'percentage' && (float) $validated['value'] > 100) {
+            return back()->withErrors(['value' => 'Percentage discount cannot be more than 100%.'])->withInput();
+        }
+
+        $validated['is_active'] = $request->boolean('is_active');
+        FeeDiscountPreset::create($validated);
+
+        return redirect()->route('fees.discount-presets')->with('success', 'Discount option created.');
+    }
+
+    public function updateDiscountPreset(Request $request, FeeDiscountPreset $preset)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'fee_category_id' => 'nullable|exists:fee_categories,id',
+            'discount_type' => 'required|in:fixed,percentage',
+            'value' => 'required|numeric|min:0.01',
+            'is_active' => 'sometimes|boolean',
+        ]);
+
+        if ($validated['discount_type'] === 'percentage' && (float) $validated['value'] > 100) {
+            return back()->withErrors(['value' => 'Percentage discount cannot be more than 100%.'])->withInput();
+        }
+
+        $validated['is_active'] = $request->boolean('is_active');
+        $preset->update($validated);
+
+        return redirect()->route('fees.discount-presets')->with('success', 'Discount option updated.');
+    }
+
+    public function destroyDiscountPreset(FeeDiscountPreset $preset)
+    {
+        $preset->delete();
+
+        return redirect()->route('fees.discount-presets')->with('success', 'Discount option deleted.');
+    }
+
     public function dueFees(Request $request)
     {
         $studentsQuery = Student::with(['schoolClass:id,name', 'section:id,name', 'academicYear'])
@@ -363,6 +421,10 @@ class FeeController extends Controller
             ['provider' => 'razorpay'],
             ['is_enabled' => false, 'currency' => 'INR']
         );
+        $discountPresets = FeeDiscountPreset::with('feeCategory:id,name')
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
         $selectedStudent = null;
         $selectedStructures = collect();
 
@@ -373,7 +435,7 @@ class FeeController extends Controller
             }
         }
 
-        return view('fees.create-payment', compact('students', 'gatewaySettings', 'selectedStudent', 'selectedStructures'));
+        return view('fees.create-payment', compact('students', 'gatewaySettings', 'selectedStudent', 'selectedStructures', 'discountPresets'));
     }
 
     public function storePayment(Request $request)
@@ -399,6 +461,8 @@ class FeeController extends Controller
             'payments' => 'nullable|array',
             'payments.*.fee_structure_id' => 'nullable|exists:fee_structures,id',
             'payments.*.amount' => 'nullable|numeric|min:0',
+            'payments.*.discount' => 'nullable|numeric|min:0',
+            'payments.*.discount_preset_id' => 'nullable|exists:fee_discount_presets,id',
         ]);
 
         $validated['payment_method'] = $this->mapLegacyPaymentMethod($validated['payment_channel']);
@@ -451,7 +515,8 @@ class FeeController extends Controller
         $bbNumber = trim((string) ($validated['bb_number'] ?? $this->resolveStudentBillBookNumber($student)));
         $paymentRows = collect($validated['payments'] ?? [])
             ->filter(function ($row) {
-                return !empty($row['fee_structure_id']) && (float) ($row['amount'] ?? 0) > 0;
+                return !empty($row['fee_structure_id'])
+                    && (((float) ($row['amount'] ?? 0) + (float) ($row['discount'] ?? 0)) > 0);
             })
             ->values();
 
@@ -489,25 +554,25 @@ class FeeController extends Controller
                         throw new \RuntimeException('One of the selected fee heads is not applicable for this student.');
                     }
 
-                    $alreadyPaid = (float) FeePayment::query()
-                        ->where('student_id', $student->id)
-                        ->where('fee_structure_id', $structure->id)
-                        ->sum('amount_paid');
-
-                    $dueAmount = max(0, (float) $structure->amount - $alreadyPaid);
+                    $alreadySettled = $this->settledAmountForStudentFee($student->id, $structure->id);
+                    $dueAmount = max(0, (float) $structure->amount - $alreadySettled);
                     $entryAmount = (float) ($row['amount'] ?? 0);
+                    $discount = (float) ($row['discount'] ?? 0);
+
+                    if ($paymentRows->count() === 1 && $discount <= 0 && (float) ($validated['discount'] ?? 0) > 0) {
+                        $discount = (float) $validated['discount'];
+                    }
 
                     if ($dueAmount <= 0) {
                         throw new \RuntimeException('A selected fee head is already fully paid and cannot be changed.');
                     }
 
-                    if ($entryAmount > $dueAmount) {
+                    if (($entryAmount + $discount) > $dueAmount) {
                         throw new \RuntimeException('Entered amount exceeds due amount for one of the selected fee heads.');
                     }
 
-                    $discount = $index === 0 ? (float) ($validated['discount'] ?? 0) : 0.0;
                     $fine = $index === 0 ? (float) ($validated['fine'] ?? 0) : 0.0;
-                    $finalPaidAgainstHead = $alreadyPaid + $entryAmount;
+                    $finalSettledAgainstHead = $alreadySettled + $entryAmount + $discount;
 
                     $payment = FeePayment::create([
                         'student_id' => $student->id,
@@ -524,7 +589,7 @@ class FeeController extends Controller
                         'cheque_number' => $validated['cheque_number'] ?? null,
                         'receipt_no' => 'RCP-' . date('Ymd') . '-' . str_pad(FeePayment::count() + 1, 4, '0', STR_PAD_LEFT),
                         'bb_number' => $bbNumber !== '' ? $bbNumber : null,
-                        'status' => $finalPaidAgainstHead >= (float) $structure->amount ? 'paid' : 'partial',
+                        'status' => $finalSettledAgainstHead >= (float) $structure->amount ? 'paid' : 'partial',
                         'remarks' => $validated['remarks'] ?? null,
                         'collected_by' => auth()->id(),
                     ]);
@@ -554,6 +619,83 @@ class FeeController extends Controller
     {
         $payment->load(['student', 'feeStructure.feeCategory', 'collector']);
         return view('fees.show-payment', compact('payment'));
+    }
+
+    public function editPayment(FeePayment $payment)
+    {
+        $payment->load(['student.schoolClass:id,name', 'student.section:id,name', 'feeStructure.feeCategory', 'collector']);
+
+        return view('fees.edit-payment', compact('payment'));
+    }
+
+    public function updatePayment(Request $request, FeePayment $payment)
+    {
+        $validated = $request->validate([
+            'amount_paid' => 'required|numeric|min:0',
+            'discount' => 'nullable|numeric|min:0',
+            'fine' => 'nullable|numeric|min:0',
+            'payment_date' => 'required|date',
+            'payment_location' => 'required|in:school,bank',
+            'payment_channel' => 'required|in:cash,upi,cheque,bank_transfer',
+            'transaction_id' => 'nullable|string|max:255',
+            'utr_number' => 'nullable|string|max:255',
+            'cheque_number' => 'nullable|string|max:255',
+            'receipt_no' => 'required|string|max:255|unique:fee_payments,receipt_no,' . $payment->id,
+            'bb_number' => 'nullable|string|max:255',
+            'remarks' => 'nullable|string',
+        ]);
+
+        $payment->load(['student', 'feeStructure']);
+        $discount = (float) ($validated['discount'] ?? 0);
+        $amountPaid = (float) $validated['amount_paid'];
+        $fine = (float) ($validated['fine'] ?? 0);
+
+        if (($amountPaid + $discount) <= 0) {
+            return back()->withErrors([
+                'amount_paid' => 'Enter either amount paid or discount for this fee record.',
+            ])->withInput();
+        }
+
+        $otherSettlement = $this->settledAmountForStudentFeeExcludingPayment(
+            (int) $payment->student_id,
+            (int) $payment->fee_structure_id,
+            (int) $payment->id
+        );
+        $maxAllowed = max(0, (float) $payment->feeStructure->amount - $otherSettlement);
+
+        if (($amountPaid + $discount) > $maxAllowed) {
+            return back()->withErrors([
+                'amount_paid' => 'Entered amount plus discount exceeds due amount for this fee head.',
+            ])->withInput();
+        }
+
+        $payment->update([
+            'amount_paid' => $amountPaid,
+            'discount' => $discount,
+            'fine' => $fine,
+            'payment_date' => $validated['payment_date'],
+            'payment_method' => $this->mapLegacyPaymentMethod($validated['payment_channel']),
+            'payment_location' => $validated['payment_location'],
+            'payment_channel' => $validated['payment_channel'],
+            'transaction_id' => $validated['transaction_id'] ?? null,
+            'utr_number' => $validated['utr_number'] ?? null,
+            'cheque_number' => $validated['cheque_number'] ?? null,
+            'receipt_no' => $validated['receipt_no'],
+            'bb_number' => blank($validated['bb_number'] ?? null) ? null : $validated['bb_number'],
+            'status' => ($otherSettlement + $amountPaid + $discount) >= (float) $payment->feeStructure->amount ? 'paid' : 'partial',
+            'remarks' => $validated['remarks'] ?? null,
+        ]);
+
+        $this->syncDiscountRecordForPayment($payment, $discount, $validated['remarks'] ?? null);
+
+        return redirect()->route('fees.payments.show', $payment)->with('success', 'Payment record updated.');
+    }
+
+    public function destroyPayment(FeePayment $payment)
+    {
+        $payment->delete();
+
+        return redirect()->route('fees.payments')->with('success', 'Payment record deleted.');
     }
 
     public function createRazorpayOrder(Request $request)
@@ -639,12 +781,8 @@ class FeeController extends Controller
 
         abort_unless(FeeStructureApplicability::appliesToStudent($structure, $student), 422, 'This fee does not apply to this student.');
 
-        $paidAmount = (float) FeePayment::query()
-            ->where('student_id', $student->id)
-            ->where('fee_structure_id', $structure->id)
-            ->sum('amount_paid');
-
-        $dueAmount = max(0, (float) $structure->amount - $paidAmount);
+        $settledAmount = $this->settledAmountForStudentFee($student->id, $structure->id);
+        $dueAmount = max(0, (float) $structure->amount - $settledAmount);
         abort_if($dueAmount <= 0, 422, 'This fee is already fully paid.');
         abort_if((float) $validated['amount'] > $dueAmount, 422, 'Entered amount exceeds the due fee amount.');
 
@@ -695,22 +833,30 @@ class FeeController extends Controller
     {
         $structures = $this->feeStructuresForStudent($student);
         $paymentsByStructure = FeePayment::query()
-            ->select('fee_structure_id', DB::raw('SUM(amount_paid) as total_paid'))
+            ->select('fee_structure_id', DB::raw('SUM(amount_paid) as total_paid'), DB::raw('SUM(discount) as total_discount'))
             ->where('student_id', $student->id)
             ->groupBy('fee_structure_id')
             ->get()
-            ->mapWithKeys(fn ($row) => [(int) $row->fee_structure_id => (float) $row->total_paid]);
+            ->mapWithKeys(fn ($row) => [(int) $row->fee_structure_id => [
+                'paid' => (float) $row->total_paid,
+                'discount' => (float) $row->total_discount,
+            ]]);
 
         $rows = $structures->map(function (FeeStructure $structure) use ($paymentsByStructure) {
-            $paidAmount = (float) ($paymentsByStructure[$structure->id] ?? 0);
+            $settlement = $paymentsByStructure[$structure->id] ?? ['paid' => 0, 'discount' => 0];
+            $paidAmount = (float) $settlement['paid'];
+            $discountAmount = (float) $settlement['discount'];
             $assignedAmount = (float) $structure->amount;
-            $dueAmount = max(0, $assignedAmount - $paidAmount);
+            $settledAmount = min($assignedAmount, $paidAmount + $discountAmount);
+            $dueAmount = max(0, $assignedAmount - $settledAmount);
 
             return [
                 'id' => $structure->id,
-                'fee_head' => $structure->feeCategory?->name ?? 'Fee',
+                'fee_category_id' => $structure->fee_category_id,
+                'fee_head' => $structure->display_name,
                 'assigned_amount' => $assignedAmount,
                 'paid_amount' => min($assignedAmount, $paidAmount),
+                'discount_amount' => min($assignedAmount, $discountAmount),
                 'due_amount' => $dueAmount,
                 'is_locked' => $dueAmount <= 0,
             ];
@@ -812,11 +958,8 @@ class FeeController extends Controller
             ]);
         }
 
-        $paidAmount = (float) FeePayment::query()
-            ->where('student_id', $student->id)
-            ->where('fee_structure_id', $structure->id)
-            ->sum('amount_paid');
-        $dueAmount = max(0, (float) $structure->amount - $paidAmount);
+        $settledAmount = $this->settledAmountForStudentFee($student->id, $structure->id);
+        $dueAmount = max(0, (float) $structure->amount - $settledAmount);
 
         if ($dueAmount <= 0) {
             return back()->withErrors([
@@ -842,7 +985,7 @@ class FeeController extends Controller
             'payment_channel' => 'upi',
             'transaction_id' => $validated['razorpay_payment_id'],
             'receipt_no' => 'RCP-' . date('Ymd') . '-' . str_pad(FeePayment::count() + 1, 4, '0', STR_PAD_LEFT),
-            'status' => (float) $validated['amount_paid'] >= $dueAmount ? 'paid' : 'partial',
+            'status' => ((float) $validated['amount_paid'] + $settledAmount) >= (float) $structure->amount ? 'paid' : 'partial',
             'remarks' => 'Paid from parent/student portal via Razorpay',
             'collected_by' => $user->id,
         ]);
@@ -886,19 +1029,17 @@ class FeeController extends Controller
             $structures = $this->feeStructuresForStudent($student);
 
             foreach ($structures as $structure) {
-                $paidAmount = (float) FeePayment::query()
-                    ->where('student_id', $student->id)
-                    ->where('fee_structure_id', $structure->id)
-                    ->sum('amount_paid');
-
-                $dueAmount = max(0, (float) $structure->amount - $paidAmount);
+                $settlement = $this->paymentSettlementForStudentFee($student->id, $structure->id);
+                $settledAmount = min((float) $structure->amount, $settlement['settled']);
+                $paidAmount = min((float) $structure->amount, $settlement['paid']);
+                $dueAmount = max(0, (float) $structure->amount - $settledAmount);
                 $totalPaidAmount += $paidAmount;
                 $totalDueAmount += $dueAmount;
 
                 $overviewItems[] = [
                     'student' => $student,
                     'structure' => $structure,
-                    'fee_head' => $structure->feeCategory?->name ?? 'N/A',
+                    'fee_head' => $structure->display_name,
                     'total_amount' => (float) $structure->amount,
                     'paid_amount' => $paidAmount,
                     'due_amount' => $dueAmount,
@@ -947,13 +1088,16 @@ class FeeController extends Controller
             ->groupBy(fn ($structure) => $structure->class_id . '-' . $structure->academic_year_id);
 
         $paymentMap = FeePayment::query()
-            ->select('student_id', 'fee_structure_id', DB::raw('SUM(amount_paid) as total_paid'))
+            ->select('student_id', 'fee_structure_id', DB::raw('SUM(amount_paid + discount) as total_settled'), DB::raw('SUM(amount_paid) as total_paid'))
             ->whereIn('student_id', $students->pluck('id'))
             ->groupBy('student_id', 'fee_structure_id')
             ->get()
             ->mapWithKeys(function ($payment) {
                 $key = $payment->student_id . '-' . $payment->fee_structure_id;
-                return [$key => (float) $payment->total_paid];
+                return [$key => [
+                    'settled' => (float) $payment->total_settled,
+                    'paid' => (float) $payment->total_paid,
+                ]];
             });
 
         $openPreviousDuesByStudent = PreviousSessionDue::query()
@@ -981,8 +1125,10 @@ class FeeController extends Controller
 
                 $assigned = (float) $structure->amount;
                 $paidKey = $student->id . '-' . $structure->id;
-                $paid = min($assigned, (float) ($paymentMap[$paidKey] ?? 0.0));
-                $due = max(0, $assigned - $paid);
+                $settlement = $paymentMap[$paidKey] ?? ['settled' => 0.0, 'paid' => 0.0];
+                $paid = min($assigned, (float) $settlement['paid']);
+                $settled = min($assigned, (float) $settlement['settled']);
+                $due = max(0, $assigned - $settled);
 
                 $totalAssigned += $assigned;
                 $totalPaid += $paid;
@@ -990,7 +1136,7 @@ class FeeController extends Controller
 
                 if ($due > 0) {
                     $dueBreakdown[] = [
-                        'fee_head' => $structure->feeCategory?->name ?? 'N/A',
+                        'fee_head' => $structure->display_name,
                         'due_amount' => $due,
                     ];
                 }
@@ -1043,6 +1189,63 @@ class FeeController extends Controller
             'cheque' => 'cheque',
             default => 'bank_transfer',
         };
+    }
+
+    private function settledAmountForStudentFee(int $studentId, int $feeStructureId): float
+    {
+        return $this->paymentSettlementForStudentFee($studentId, $feeStructureId)['settled'];
+    }
+
+    private function paymentSettlementForStudentFee(int $studentId, int $feeStructureId): array
+    {
+        $row = FeePayment::query()
+            ->selectRaw('COALESCE(SUM(amount_paid), 0) as total_paid, COALESCE(SUM(discount), 0) as total_discount')
+            ->where('student_id', $studentId)
+            ->where('fee_structure_id', $feeStructureId)
+            ->first();
+
+        $paid = (float) ($row->total_paid ?? 0);
+        $discount = (float) ($row->total_discount ?? 0);
+
+        return [
+            'paid' => $paid,
+            'discount' => $discount,
+            'settled' => $paid + $discount,
+        ];
+    }
+
+    private function settledAmountForStudentFeeExcludingPayment(int $studentId, int $feeStructureId, int $paymentId): float
+    {
+        $row = FeePayment::query()
+            ->selectRaw('COALESCE(SUM(amount_paid), 0) as total_paid, COALESCE(SUM(discount), 0) as total_discount')
+            ->where('student_id', $studentId)
+            ->where('fee_structure_id', $feeStructureId)
+            ->where('id', '!=', $paymentId)
+            ->first();
+
+        return (float) ($row->total_paid ?? 0) + (float) ($row->total_discount ?? 0);
+    }
+
+    private function syncDiscountRecordForPayment(FeePayment $payment, float $discount, ?string $remarks = null): void
+    {
+        if ($discount <= 0) {
+            FeeDiscountRecord::query()
+                ->where('fee_payment_id', $payment->id)
+                ->delete();
+
+            return;
+        }
+
+        FeeDiscountRecord::updateOrCreate(
+            ['fee_payment_id' => $payment->id],
+            [
+                'student_id' => $payment->student_id,
+                'fee_structure_id' => $payment->fee_structure_id,
+                'discount_amount' => $discount,
+                'remarks' => $remarks,
+                'created_by' => auth()->id(),
+            ]
+        );
     }
 
     private function studentFullNameExpression(): string
@@ -1110,7 +1313,7 @@ class FeeController extends Controller
             $message = "A fee discount has been given.\n\n"
                 . 'Student: ' . ($payment->student?->full_name ?? 'N/A') . "\n"
                 . 'Admission No: ' . ($payment->student?->admission_no ?? '-') . "\n"
-                . 'Fee Head: ' . ($payment->feeStructure?->feeCategory?->name ?? '-') . "\n"
+                . 'Fee Head: ' . ($payment->feeStructure?->display_name ?? '-') . "\n"
                 . 'Discount: Rs ' . number_format($discount, 2) . "\n"
                 . 'Payment Receipt: ' . ($payment->receipt_no ?? '-') . "\n"
                 . 'Remarks: ' . ($remarks ?: '-') . "\n";

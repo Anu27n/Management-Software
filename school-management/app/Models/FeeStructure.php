@@ -34,4 +34,13 @@ class FeeStructure extends Model
     {
         return $this->hasMany(FeePayment::class);
     }
+
+    public function getDisplayNameAttribute(): string
+    {
+        if ($this->frequency === 'quarterly' && $this->due_date) {
+            return $this->due_date->format('F') . ' Quarter';
+        }
+
+        return $this->feeCategory?->name ?? 'Fee';
+    }
 }

@@ -530,6 +530,9 @@
             <a href="{{ route('fees.discounts') }}" class="nav-link {{ request()->routeIs('fees.discounts') ? 'active' : '' }}">
                 <i class="bi bi-percent"></i> Discount Records
             </a>
+            <a href="{{ route('fees.discount-presets') }}" class="nav-link {{ request()->routeIs('fees.discount-presets*') ? 'active' : '' }}">
+                <i class="bi bi-tags"></i> Discount Options
+            </a>
             <a href="{{ route('fees.due') }}" class="nav-link {{ request()->routeIs('fees.due') ? 'active' : '' }}">
                 <i class="bi bi-exclamation-circle"></i> Due Fees
             </a>
@@ -811,6 +814,9 @@
         </a>
         <a href="{{ route('fees.discounts') }}" class="more-menu-item {{ request()->routeIs('fees.discounts') ? 'active' : '' }}">
             <i class="bi bi-percent"></i> Discount Records
+        </a>
+        <a href="{{ route('fees.discount-presets') }}" class="more-menu-item {{ request()->routeIs('fees.discount-presets*') ? 'active' : '' }}">
+            <i class="bi bi-tags"></i> Discount Options
         </a>
         <a href="{{ route('fees.due') }}" class="more-menu-item {{ request()->routeIs('fees.due') ? 'active' : '' }}">
             <i class="bi bi-exclamation-circle"></i> Due Fees
