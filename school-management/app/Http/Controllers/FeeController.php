@@ -13,6 +13,7 @@ use App\Models\PaymentGatewaySetting;
 use App\Models\Student;
 use App\Models\SchoolClass;
 use App\Models\AcademicYear;
+use App\Support\DateFormatter;
 use App\Support\FeeStructureApplicability;
 use App\Support\QuarterlyFeeDueDates;
 use Illuminate\Http\Request;
@@ -163,8 +164,14 @@ class FeeController extends Controller
             $query->whereDate('payment_date', '<=', $request->date_to);
         }
 
+        $registerView = $request->input('register_view', 'day_wise');
+        $registerSummary = $this->buildFeeRegisterSummary(
+            (clone $query)->with('feeStructure')->get(),
+            $registerView
+        );
         $payments = $query->latest()->paginate(20);
-        return view('fees.payments', compact('payments'));
+
+        return view('fees.payments', compact('payments', 'registerView', 'registerSummary'));
     }
 
     public function discounts(Request $request)
@@ -229,18 +236,19 @@ class FeeController extends Controller
             'name' => 'required|string|max:255',
             'fee_category_id' => 'nullable|exists:fee_categories,id',
             'discount_type' => 'required|in:fixed,percentage',
+            'eligibility_rule' => 'required|in:standard,sibling',
             'value' => 'required|numeric|min:0.01',
             'is_active' => 'sometimes|boolean',
         ]);
 
         if ($validated['discount_type'] === 'percentage' && (float) $validated['value'] > 100) {
-            return back()->withErrors(['value' => 'Percentage discount cannot be more than 100%.'])->withInput();
+            return back()->withErrors(['value' => 'Percentage concession cannot be more than 100%.'])->withInput();
         }
 
         $validated['is_active'] = $request->boolean('is_active');
         FeeDiscountPreset::create($validated);
 
-        return redirect()->route('fees.discount-presets')->with('success', 'Discount option created.');
+        return redirect()->route('fees.discount-presets')->with('success', 'Concession option created.');
     }
 
     public function updateDiscountPreset(Request $request, FeeDiscountPreset $preset)
@@ -249,25 +257,26 @@ class FeeController extends Controller
             'name' => 'required|string|max:255',
             'fee_category_id' => 'nullable|exists:fee_categories,id',
             'discount_type' => 'required|in:fixed,percentage',
+            'eligibility_rule' => 'required|in:standard,sibling',
             'value' => 'required|numeric|min:0.01',
             'is_active' => 'sometimes|boolean',
         ]);
 
         if ($validated['discount_type'] === 'percentage' && (float) $validated['value'] > 100) {
-            return back()->withErrors(['value' => 'Percentage discount cannot be more than 100%.'])->withInput();
+            return back()->withErrors(['value' => 'Percentage concession cannot be more than 100%.'])->withInput();
         }
 
         $validated['is_active'] = $request->boolean('is_active');
         $preset->update($validated);
 
-        return redirect()->route('fees.discount-presets')->with('success', 'Discount option updated.');
+        return redirect()->route('fees.discount-presets')->with('success', 'Concession option updated.');
     }
 
     public function destroyDiscountPreset(FeeDiscountPreset $preset)
     {
         $preset->delete();
 
-        return redirect()->route('fees.discount-presets')->with('success', 'Discount option deleted.');
+        return redirect()->route('fees.discount-presets')->with('success', 'Concession option deleted.');
     }
 
     public function dueFees(Request $request)
@@ -558,6 +567,7 @@ class FeeController extends Controller
                     $dueAmount = max(0, (float) $structure->amount - $alreadySettled);
                     $entryAmount = (float) ($row['amount'] ?? 0);
                     $discount = (float) ($row['discount'] ?? 0);
+                    $discountPresetId = !empty($row['discount_preset_id']) ? (int) $row['discount_preset_id'] : null;
 
                     if ($paymentRows->count() === 1 && $discount <= 0 && (float) ($validated['discount'] ?? 0) > 0) {
                         $discount = (float) $validated['discount'];
@@ -570,6 +580,8 @@ class FeeController extends Controller
                     if (($entryAmount + $discount) > $dueAmount) {
                         throw new \RuntimeException('Entered amount exceeds due amount for one of the selected fee heads.');
                     }
+
+                    $this->assertConcessionEligibility($student, $structure, $discount, $discountPresetId);
 
                     $fine = $index === 0 ? (float) ($validated['fine'] ?? 0) : 0.0;
                     $finalSettledAgainstHead = $alreadySettled + $entryAmount + $discount;
@@ -624,8 +636,23 @@ class FeeController extends Controller
     public function editPayment(FeePayment $payment)
     {
         $payment->load(['student.schoolClass:id,name', 'student.section:id,name', 'feeStructure.feeCategory', 'collector']);
+        $otherSettlement = $this->paymentSettlementSummaryExcludingPayment(
+            (int) $payment->student_id,
+            (int) $payment->fee_structure_id,
+            (int) $payment->id
+        );
+        $assignedAmount = (float) ($payment->feeStructure?->amount ?? 0);
+        $settledBeforeEdit = min($assignedAmount, (float) $otherSettlement['settled']);
+        $paymentSummary = [
+            'assigned_amount' => $assignedAmount,
+            'paid_before' => min($assignedAmount, (float) $otherSettlement['paid']),
+            'concession_before' => min($assignedAmount, (float) $otherSettlement['discount']),
+            'current_paid' => (float) $payment->amount_paid,
+            'current_concession' => (float) $payment->discount,
+            'due_after' => max(0, $assignedAmount - min($assignedAmount, $settledBeforeEdit + (float) $payment->amount_paid + (float) $payment->discount)),
+        ];
 
-        return view('fees.edit-payment', compact('payment'));
+        return view('fees.edit-payment', compact('payment', 'paymentSummary'));
     }
 
     public function updatePayment(Request $request, FeePayment $payment)
@@ -652,7 +679,7 @@ class FeeController extends Controller
 
         if (($amountPaid + $discount) <= 0) {
             return back()->withErrors([
-                'amount_paid' => 'Enter either amount paid or discount for this fee record.',
+                'amount_paid' => 'Enter either amount paid or concession for this fee record.',
             ])->withInput();
         }
 
@@ -665,7 +692,7 @@ class FeeController extends Controller
 
         if (($amountPaid + $discount) > $maxAllowed) {
             return back()->withErrors([
-                'amount_paid' => 'Entered amount plus discount exceeds due amount for this fee head.',
+                'amount_paid' => 'Entered amount plus concession exceeds due amount for this fee head.',
             ])->withInput();
         }
 
@@ -859,6 +886,8 @@ class FeeController extends Controller
                 'discount_amount' => min($assignedAmount, $discountAmount),
                 'due_amount' => $dueAmount,
                 'is_locked' => $dueAmount <= 0,
+                'frequency' => $structure->frequency,
+                'due_date' => $structure->due_date?->format('Y-m-d'),
             ];
         })->values();
 
@@ -1216,6 +1245,11 @@ class FeeController extends Controller
 
     private function settledAmountForStudentFeeExcludingPayment(int $studentId, int $feeStructureId, int $paymentId): float
     {
+        return $this->paymentSettlementSummaryExcludingPayment($studentId, $feeStructureId, $paymentId)['settled'];
+    }
+
+    private function paymentSettlementSummaryExcludingPayment(int $studentId, int $feeStructureId, int $paymentId): array
+    {
         $row = FeePayment::query()
             ->selectRaw('COALESCE(SUM(amount_paid), 0) as total_paid, COALESCE(SUM(discount), 0) as total_discount')
             ->where('student_id', $studentId)
@@ -1223,7 +1257,14 @@ class FeeController extends Controller
             ->where('id', '!=', $paymentId)
             ->first();
 
-        return (float) ($row->total_paid ?? 0) + (float) ($row->total_discount ?? 0);
+        $paid = (float) ($row->total_paid ?? 0);
+        $discount = (float) ($row->total_discount ?? 0);
+
+        return [
+            'paid' => $paid,
+            'discount' => $discount,
+            'settled' => $paid + $discount,
+        ];
     }
 
     private function syncDiscountRecordForPayment(FeePayment $payment, float $discount, ?string $remarks = null): void
@@ -1310,17 +1351,17 @@ class FeeController extends Controller
 
             $payment->loadMissing(['student:id,first_name,last_name,admission_no', 'feeStructure.feeCategory:id,name']);
 
-            $message = "A fee discount has been given.\n\n"
+            $message = "A fee concession has been given.\n\n"
                 . 'Student: ' . ($payment->student?->full_name ?? 'N/A') . "\n"
                 . 'Admission No: ' . ($payment->student?->admission_no ?? '-') . "\n"
                 . 'Fee Head: ' . ($payment->feeStructure?->display_name ?? '-') . "\n"
-                . 'Discount: Rs ' . number_format($discount, 2) . "\n"
+                . 'Concession: Rs ' . number_format($discount, 2) . "\n"
                 . 'Payment Receipt: ' . ($payment->receipt_no ?? '-') . "\n"
                 . 'Remarks: ' . ($remarks ?: '-') . "\n";
 
             Mail::raw($message, function ($mail) use ($adminEmails) {
                 $mail->to($adminEmails->all())
-                    ->subject('Fee Discount Alert');
+                    ->subject('Fee Concession Alert');
             });
         } catch (Throwable $exception) {
             // Do not block payment recording if notification delivery fails.
@@ -1333,5 +1374,114 @@ class FeeController extends Controller
         $value = trim((string) ($student->profile?->fee_booklet_number ?? ''));
 
         return $value !== '' ? $value : null;
+    }
+
+    private function assertConcessionEligibility(Student $student, FeeStructure $structure, float $discount, ?int $presetId): void
+    {
+        if ($discount <= 0 || !$presetId) {
+            return;
+        }
+
+        $preset = FeeDiscountPreset::query()->find($presetId);
+        if (!$preset || $preset->eligibility_rule !== 'sibling') {
+            return;
+        }
+
+        if ($structure->frequency !== 'quarterly' || !$structure->due_date) {
+            throw new \RuntimeException('Sibling concession is allowed only on quarterly fee heads.');
+        }
+
+        $student->loadMissing('profile', 'schoolClass');
+        $siblingIds = collect($student->profile?->sibling_details ?? [])
+            ->pluck('student_id')
+            ->filter(fn ($value) => filled($value))
+            ->map(fn ($value) => (int) $value)
+            ->unique()
+            ->values();
+
+        if ($siblingIds->isEmpty()) {
+            throw new \RuntimeException('Assign an elder sibling in admission before giving sibling concession.');
+        }
+
+        $siblings = Student::query()
+            ->with(['profile', 'schoolClass'])
+            ->whereIn('id', $siblingIds)
+            ->where('status', 'active')
+            ->get();
+        $studentRank = $this->classRank($student->schoolClass);
+        $matchingSibling = $siblings->first(function (Student $sibling) use ($studentRank, $structure) {
+            $siblingRank = $this->classRank($sibling->schoolClass);
+            if ($siblingRank <= $studentRank) {
+                return false;
+            }
+
+            $quarterStructures = $this->feeStructuresForStudent($sibling)
+                ->filter(function (FeeStructure $candidate) use ($structure) {
+                    return $candidate->frequency === 'quarterly'
+                        && $candidate->due_date?->format('Y-m') === $structure->due_date?->format('Y-m');
+                })
+                ->values();
+
+            if ($quarterStructures->isEmpty()) {
+                return false;
+            }
+
+            return $quarterStructures->every(function (FeeStructure $candidate) use ($sibling) {
+                return $this->settledAmountForStudentFee($sibling->id, $candidate->id) >= (float) $candidate->amount;
+            });
+        });
+
+        if (!$matchingSibling) {
+            throw new \RuntimeException('Sibling concession requires an assigned elder sibling with the same quarter fee fully paid.');
+        }
+    }
+
+    private function classRank(?SchoolClass $class): int
+    {
+        $numeric = trim((string) ($class?->numeric_name ?? ''));
+        if ($numeric !== '' && is_numeric($numeric)) {
+            return (int) $numeric;
+        }
+
+        preg_match('/\d+/', (string) ($class?->name ?? ''), $matches);
+
+        return isset($matches[0]) ? (int) $matches[0] : 0;
+    }
+
+    private function buildFeeRegisterSummary(Collection $payments, string $registerView): Collection
+    {
+        $grouped = match ($registerView) {
+            'month_wise' => $payments->groupBy(fn (FeePayment $payment) => $payment->payment_date?->format('Y-m')),
+            'quarter_wise' => $payments->groupBy(fn (FeePayment $payment) => $payment->payment_date?->format('Y') . '-Q' . $payment->payment_date?->quarter),
+            'quarter_fee_wise' => $payments
+                ->filter(fn (FeePayment $payment) => $payment->feeStructure?->frequency === 'quarterly')
+                ->groupBy(fn (FeePayment $payment) => $payment->feeStructure?->id ?? 0),
+            default => $payments->groupBy(fn (FeePayment $payment) => $payment->payment_date?->format('Y-m-d')),
+        };
+
+        return $grouped->map(function (Collection $items, $key) use ($registerView) {
+            $sample = $items->first();
+            $label = match ($registerView) {
+                'month_wise' => $sample?->payment_date?->format('m y') ?? (string) $key,
+                'quarter_wise' => $sample?->payment_date ? 'Q' . $sample->payment_date->quarter . ' ' . $sample->payment_date->format('y') : (string) $key,
+                'quarter_fee_wise' => $sample?->feeStructure?->display_name
+                    ? $sample->feeStructure->display_name . ' (' . DateFormatter::display($sample->feeStructure?->due_date) . ')'
+                    : 'Quarter Fee',
+                default => DateFormatter::display($sample?->payment_date),
+            };
+
+            $paid = (float) $items->sum(fn (FeePayment $payment) => (float) $payment->amount_paid);
+            $discount = (float) $items->sum(fn (FeePayment $payment) => (float) $payment->discount);
+            $fine = (float) $items->sum(fn (FeePayment $payment) => (float) $payment->fine);
+
+            return [
+                'label' => $label,
+                'records' => $items->count(),
+                'amount_paid' => $paid,
+                'concession_amount' => $discount,
+                'fine_amount' => $fine,
+                'settled_amount' => $paid + $discount,
+            ];
+        })->values();
     }
 }

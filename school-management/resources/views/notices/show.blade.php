@@ -15,9 +15,9 @@
             </div>
         </div>
         <div class="text-end">
-            <div class="text-muted small">Published: {{ $notice->publish_date->format('M d, Y') }}</div>
+            <div class="text-muted small">Published: {{ \App\Support\DateFormatter::display($notice->publish_date) }}</div>
             @if($notice->expiry_date)
-            <div class="text-muted small">Expires: {{ $notice->expiry_date->format('M d, Y') }}</div>
+            <div class="text-muted small">Expires: {{ \App\Support\DateFormatter::display($notice->expiry_date) }}</div>
             @endif
         </div>
     </div>

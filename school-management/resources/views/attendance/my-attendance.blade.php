@@ -84,7 +84,7 @@
                 <tbody>
                     @forelse($records as $record)
                         <tr>
-                            <td>{{ $record->date?->format('d M Y') }}</td>
+                            <td>{{ \App\Support\DateFormatter::display($record->date) }}</td>
                             <td>
                                 <span class="badge bg-{{ $record->status === 'present' ? 'success' : ($record->status === 'absent' ? 'danger' : 'warning') }}">
                                     {{ ucwords(str_replace('_', ' ', $record->status)) }}

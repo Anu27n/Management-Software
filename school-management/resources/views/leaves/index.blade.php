@@ -50,8 +50,8 @@
                         <small class="text-muted">{{ $leave->reason }}</small>
                     </td>
                     <td>{{ $leave->schoolClass->name ?? '-' }} / {{ $leave->section->name ?? '-' }}</td>
-                    <td>{{ $leave->from_date->format('M d, Y') }}</td>
-                    <td>{{ $leave->to_date->format('M d, Y') }}</td>
+                    <td>{{ \App\Support\DateFormatter::display($leave->from_date) }}</td>
+                    <td>{{ \App\Support\DateFormatter::display($leave->to_date) }}</td>
                     <td>{{ $leave->from_date->diffInDays($leave->to_date) + 1 }}</td>
                     <td>{{ $leave->appliedBy->name ?? '-' }}</td>
                     <td>

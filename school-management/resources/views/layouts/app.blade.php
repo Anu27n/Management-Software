@@ -528,10 +528,10 @@
                 <i class="bi bi-clock-history"></i> Previous Session Dues
             </a>
             <a href="{{ route('fees.discounts') }}" class="nav-link {{ request()->routeIs('fees.discounts') ? 'active' : '' }}">
-                <i class="bi bi-percent"></i> Discount Records
+                <i class="bi bi-percent"></i> Concession Records
             </a>
             <a href="{{ route('fees.discount-presets') }}" class="nav-link {{ request()->routeIs('fees.discount-presets*') ? 'active' : '' }}">
-                <i class="bi bi-tags"></i> Discount Options
+                <i class="bi bi-tags"></i> Concession Options
             </a>
             <a href="{{ route('fees.due') }}" class="nav-link {{ request()->routeIs('fees.due') ? 'active' : '' }}">
                 <i class="bi bi-exclamation-circle"></i> Due Fees
@@ -813,10 +813,10 @@
             <i class="bi bi-clock-history"></i> Previous Session Dues
         </a>
         <a href="{{ route('fees.discounts') }}" class="more-menu-item {{ request()->routeIs('fees.discounts') ? 'active' : '' }}">
-            <i class="bi bi-percent"></i> Discount Records
+            <i class="bi bi-percent"></i> Concession Records
         </a>
         <a href="{{ route('fees.discount-presets') }}" class="more-menu-item {{ request()->routeIs('fees.discount-presets*') ? 'active' : '' }}">
-            <i class="bi bi-tags"></i> Discount Options
+            <i class="bi bi-tags"></i> Concession Options
         </a>
         <a href="{{ route('fees.due') }}" class="more-menu-item {{ request()->routeIs('fees.due') ? 'active' : '' }}">
             <i class="bi bi-exclamation-circle"></i> Due Fees

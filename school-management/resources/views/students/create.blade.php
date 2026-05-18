@@ -18,6 +18,17 @@
     $fatherOccupationOptions = ['Private Job', 'Government Job', 'Business', 'Professional', 'Unemployed'];
     $motherOccupationOptions = ['Private Job', 'Government Job', 'Business', 'Professional', 'Housewife'];
     $siblingDetails = old('sibling_details', []);
+    $siblingCandidatePayload = $siblingCandidates->map(fn ($candidate) => [
+        'id' => $candidate->id,
+        'full_name' => $candidate->full_name,
+        'admission_no' => $candidate->admission_no,
+        'class_id' => $candidate->class_id,
+        'class_name' => $candidate->schoolClass?->name,
+        'section_name' => $candidate->section?->name,
+        'father_name' => $candidate->father_name,
+        'mother_name' => $candidate->mother_name,
+        'label' => trim($candidate->admission_no . ' - ' . $candidate->full_name . ' - ' . ($candidate->schoolClass?->name ?? '')),
+    ])->values();
 @endphp
 
 <div class="card table-card">
@@ -284,6 +295,10 @@
                     <label class="form-label">Number of Siblings</label>
                     <input type="number" min="1" max="10" name="sibling_count" id="sibling_count" class="form-control" value="{{ old('sibling_count', max(1, count($siblingDetails))) }}">
                 </div>
+                <div class="col-md-6 {{ old('has_siblings') == '1' ? '' : 'd-none' }}" id="sibling_helper_wrap">
+                    <label class="form-label">Assignment Rule</label>
+                    <div class="form-control bg-light">Assigned siblings are linked only when both father name and mother name match.</div>
+                </div>
             </div>
             <div id="siblings_container" class="{{ old('has_siblings') == '1' ? '' : 'd-none' }}"></div>
 
@@ -378,6 +393,61 @@
     const siblingsContainer = document.getElementById('siblings_container');
     const siblingDetails = @json(array_values($siblingDetails));
     const siblingClassOptions = @json($classes->map(fn ($class) => ['id' => $class->id, 'name' => $class->name])->values());
+    const siblingStudentOptions = @json($siblingCandidatePayload);
+
+    function escapeHtml(value) {
+        const div = document.createElement('div');
+        div.textContent = value == null ? '' : String(value);
+        return div.innerHTML;
+    }
+
+    function buildSiblingStudentOptions(selectedStudentId) {
+        return siblingStudentOptions.map(function (student) {
+            const selected = String(selectedStudentId || '') === String(student.id) ? 'selected' : '';
+            return `<option value="${student.id}" ${selected}>${escapeHtml(student.label)}</option>`;
+        }).join('');
+    }
+
+    function populateAssignedSibling(index, studentId) {
+        const sibling = siblingStudentOptions.find(function (item) {
+            return String(item.id) === String(studentId || '');
+        });
+        const card = siblingsContainer.querySelector(`[data-sibling-card="${index}"]`);
+
+        if (!card) {
+            return;
+        }
+
+        const nameInput = card.querySelector(`input[name="sibling_details[${index}][name]"]`);
+        const classSelect = card.querySelector(`select[name="sibling_details[${index}][class_id]"]`);
+        const studyingSelect = card.querySelector(`select[name="sibling_details[${index}][is_studying]"]`);
+        const helper = card.querySelector('[data-assigned-sibling-meta]');
+
+        if (!sibling) {
+            if (helper) {
+                helper.textContent = 'Optional: choose an existing student to assign as sibling.';
+            }
+            return;
+        }
+
+        if (nameInput) {
+            nameInput.value = sibling.full_name || '';
+        }
+        if (classSelect) {
+            classSelect.value = sibling.class_id || '';
+        }
+        if (studyingSelect) {
+            studyingSelect.value = '1';
+        }
+        if (helper) {
+            helper.textContent = `Assigned: ${sibling.admission_no} | ${sibling.class_name || '-'}${sibling.section_name ? ' - ' + sibling.section_name : ''} | Father: ${sibling.father_name || '-'} | Mother: ${sibling.mother_name || '-'}`;
+        }
+
+        const classWrap = card.querySelector(`.sibling-class-wrap[data-index="${index}"]`);
+        if (classWrap) {
+            classWrap.classList.remove('d-none');
+        }
+    }
 
     function bindSections() {
         sectionSelect.innerHTML = '<option value="">Select Section</option>';
@@ -414,14 +484,23 @@
     function buildSiblingCard(index, sibling) {
         const isStudying = sibling && (String(sibling.is_studying) === '1' || sibling.is_studying === true);
         const selectedClassId = sibling && sibling.class_id ? String(sibling.class_id) : '';
+        const selectedStudentId = sibling && sibling.student_id ? String(sibling.student_id) : '';
         const classOptions = siblingClassOptions.map(function (schoolClass) {
             return `<option value="${schoolClass.id}" ${selectedClassId === String(schoolClass.id) ? 'selected' : ''}>${schoolClass.name}</option>`;
         }).join('');
 
         return `
-            <div class="border rounded p-3 mb-3">
+            <div class="border rounded p-3 mb-3" data-sibling-card="${index}">
                 <div class="fw-semibold mb-3">Sibling ${index + 1}</div>
                 <div class="row g-3">
+                    <div class="col-md-12">
+                        <label class="form-label">Assign Existing Student</label>
+                        <select name="sibling_details[${index}][student_id]" class="form-select sibling-student-select" data-index="${index}">
+                            <option value="">Select existing sibling</option>
+                            ${buildSiblingStudentOptions(selectedStudentId)}
+                        </select>
+                        <div class="form-text" data-assigned-sibling-meta>Optional: choose an existing student to assign as sibling.</div>
+                    </div>
                     <div class="col-md-4">
                         <label class="form-label">Name</label>
                         <input type="text" name="sibling_details[${index}][name]" class="form-control" value="${sibling?.name ?? ''}">
@@ -452,6 +531,7 @@
     function renderSiblings() {
         const enabled = hasSiblingsSelect.value === '1';
         siblingCountWrap.classList.toggle('d-none', !enabled);
+        document.getElementById('sibling_helper_wrap')?.classList.toggle('d-none', !enabled);
         siblingsContainer.classList.toggle('d-none', !enabled);
 
         if (!enabled) {
@@ -468,6 +548,9 @@
         }
 
         siblingsContainer.innerHTML = html;
+        for (let i = 0; i < count; i++) {
+            populateAssignedSibling(i, siblingDetails[i]?.student_id || '');
+        }
     }
 
     document.addEventListener('change', function (event) {
@@ -477,6 +560,10 @@
             if (classWrap) {
                 classWrap.classList.toggle('d-none', event.target.value !== '1');
             }
+        }
+
+        if (event.target.classList.contains('sibling-student-select')) {
+            populateAssignedSibling(event.target.dataset.index, event.target.value);
         }
     });
 

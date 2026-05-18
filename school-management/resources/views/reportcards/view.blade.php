@@ -3,6 +3,7 @@
 @section('page-title', 'Report Card')
 
 @section('content')
+@php($templateOptions = \App\Support\ReportTemplateRegistry::all())
 <div class="card table-card mb-4">
     <div class="card-body">
         <form method="GET" action="{{ route('reportcards.view') }}" class="row g-2 align-items-end">
@@ -18,8 +19,9 @@
             <div class="col-md-3">
                 <label class="form-label">Marksheet Template</label>
                 <select name="report_template" class="form-select" required>
-                    <option value="semester_1" {{ $selectedTemplate === 'semester_1' ? 'selected' : '' }}>1st Semester</option>
-                    <option value="semester_2" {{ $selectedTemplate === 'semester_2' ? 'selected' : '' }}>Final / 2nd Semester</option>
+                    @foreach($templateOptions as $templateKey => $templateMeta)
+                        <option value="{{ $templateKey }}" {{ $selectedTemplate === $templateKey ? 'selected' : '' }}>{{ $templateMeta['label'] }}</option>
+                    @endforeach
                 </select>
             </div>
             <div class="col-md-4">

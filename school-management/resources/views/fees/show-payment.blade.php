@@ -20,7 +20,7 @@
                 @if($payment->bb_number)
                 <p><strong>B.B Number:</strong> {{ $payment->bb_number }}</p>
                 @endif
-                <p><strong>Date:</strong> {{ $payment->payment_date->format('M d, Y') }}</p>
+                <p><strong>Date:</strong> {{ \App\Support\DateFormatter::display($payment->payment_date) }}</p>
                 <p><strong>Payment Location:</strong> {{ ucfirst($payment->payment_location ?: 'school') }}</p>
                 <p><strong>Payment Mode:</strong> {{ ucfirst(str_replace('_', ' ', $payment->payment_channel ?: $payment->payment_method)) }}</p>
                 @if($payment->transaction_id)
@@ -40,10 +40,10 @@
             </div>
         </div>
         <table class="table table-bordered">
-            <tr><td>Fee Amount</td><td class="text-end">₹{{ number_format($payment->feeStructure->amount ?? 0, 2) }}</td></tr>
-            <tr><td>Discount</td><td class="text-end text-success">- ₹{{ number_format($payment->discount, 2) }}</td></tr>
-            <tr><td>Fine</td><td class="text-end text-danger">+ ₹{{ number_format($payment->fine, 2) }}</td></tr>
-            <tr class="table-primary"><td class="fw-bold">Amount Paid</td><td class="text-end fw-bold">₹{{ number_format($payment->amount_paid, 2) }}</td></tr>
+            <tr><td>Fee Amount</td><td class="text-end">Rs {{ number_format($payment->feeStructure->amount ?? 0, 2) }}</td></tr>
+            <tr><td>Concession</td><td class="text-end text-success">- Rs {{ number_format($payment->discount, 2) }}</td></tr>
+            <tr><td>Fine</td><td class="text-end text-danger">+ Rs {{ number_format($payment->fine, 2) }}</td></tr>
+            <tr class="table-primary"><td class="fw-bold">Amount Paid</td><td class="text-end fw-bold">Rs {{ number_format($payment->amount_paid, 2) }}</td></tr>
         </table>
         <p><strong>Status:</strong> <span class="badge bg-{{ $payment->status == 'paid' ? 'success' : 'warning' }}">{{ $payment->status == 'paid' ? 'Fully Paid' : ($payment->status == 'partial' ? 'Partially Paid' : ucfirst($payment->status)) }}</span></p>
         @if($payment->remarks)
@@ -58,7 +58,7 @@
         <a href="{{ route('fees.payments.edit', $payment) }}" class="btn btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit</a>
     @endif
     @if($canDeletePayments)
-        <form action="{{ route('fees.payments.destroy', $payment) }}" method="POST" onsubmit="return confirm('Delete this fee payment record? This will also remove its discount record.')" class="m-0">
+        <form action="{{ route('fees.payments.destroy', $payment) }}" method="POST" onsubmit="return confirm('Delete this fee payment record? This will also remove its concession record.')" class="m-0">
             @csrf
             @method('DELETE')
             <button class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i>Delete</button>

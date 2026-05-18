@@ -132,7 +132,7 @@
                         <td>{{ $payment->student?->full_name ?? '-' }}</td>
                         <td>{{ $payment->feeStructure?->display_name ?? '-' }}</td>
                         <td>Rs {{ number_format($payment->amount_paid, 2) }}</td>
-                        <td>{{ $payment->payment_date?->format('d M Y') }}</td>
+                        <td>{{ \App\Support\DateFormatter::display($payment->payment_date) }}</td>
                         <td>
                             <span class="badge bg-{{ $payment->status === 'paid' ? 'success' : ($payment->status === 'partial' ? 'warning' : 'secondary') }}">
                                 {{ ucfirst($payment->status) }}

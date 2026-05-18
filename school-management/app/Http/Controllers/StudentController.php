@@ -82,8 +82,14 @@ class StudentController extends Controller
             ->orderByDesc('is_active')
             ->orderByDesc('start_date')
             ->get();
+        $siblingCandidates = Student::query()
+            ->with(['schoolClass:id,name', 'section:id,name'])
+            ->where('status', 'active')
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'admission_no', 'first_name', 'last_name', 'father_name', 'mother_name', 'class_id', 'section_id']);
 
-        return view('students.create', compact('classes', 'academicYears'));
+        return view('students.create', compact('classes', 'academicYears', 'siblingCandidates'));
     }
 
     public function bulkUploadForm()
@@ -718,18 +724,7 @@ class StudentController extends Controller
     {
         $className = SchoolClass::query()->whereKey($validated['class_id'])->value('name');
         $isRteEligible = ClassEligibility::isRteEligible($className);
-        $siblingDetails = collect($validated['sibling_details'] ?? [])
-            ->filter(fn ($item) => is_array($item) && filled($item['name'] ?? null))
-            ->map(function (array $item) {
-                return [
-                    'name' => trim((string) ($item['name'] ?? '')),
-                    'is_studying' => !empty($item['is_studying']),
-                    'class_id' => !empty($item['class_id']) ? (int) $item['class_id'] : null,
-                    'notes' => filled($item['notes'] ?? null) ? trim((string) $item['notes']) : null,
-                ];
-            })
-            ->values()
-            ->all();
+        $siblingDetails = $this->buildSiblingDetails($validated);
         $firstSibling = $siblingDetails[0] ?? null;
         $secondSibling = $siblingDetails[1] ?? null;
 
@@ -943,6 +938,55 @@ class StudentController extends Controller
             // Do not block admission if email delivery fails on shared hosting.
         }
     }
-}
 
+    private function buildSiblingDetails(array $validated): array
+    {
+        $rawSiblings = collect($validated['sibling_details'] ?? [])
+            ->filter(fn ($item) => is_array($item))
+            ->values();
+        $linkedSiblingIds = $rawSiblings
+            ->pluck('student_id')
+            ->filter(fn ($value) => filled($value))
+            ->map(fn ($value) => (int) $value)
+            ->unique()
+            ->values();
+        $linkedSiblings = Student::query()
+            ->with('schoolClass:id,name')
+            ->whereIn('id', $linkedSiblingIds)
+            ->get()
+            ->keyBy('id');
+
+        return $rawSiblings
+            ->map(function (array $item) use ($linkedSiblings) {
+                $linkedSibling = filled($item['student_id'] ?? null)
+                    ? $linkedSiblings->get((int) $item['student_id'])
+                    : null;
+
+                $name = $linkedSibling?->full_name
+                    ?: trim((string) ($item['name'] ?? ''));
+                $classId = $linkedSibling?->class_id
+                    ?: (!empty($item['class_id']) ? (int) $item['class_id'] : null);
+                $className = $linkedSibling?->schoolClass?->name;
+
+                if ($name === '') {
+                    return null;
+                }
+
+                return [
+                    'student_id' => $linkedSibling?->id,
+                    'admission_no' => $linkedSibling?->admission_no,
+                    'name' => $name,
+                    'is_studying' => $linkedSibling ? true : !empty($item['is_studying']),
+                    'class_id' => $classId,
+                    'class_name' => $className,
+                    'father_name' => $linkedSibling?->father_name,
+                    'mother_name' => $linkedSibling?->mother_name,
+                    'notes' => filled($item['notes'] ?? null) ? trim((string) $item['notes']) : null,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+}
 

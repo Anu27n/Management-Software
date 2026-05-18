@@ -19,7 +19,7 @@
                     <span class="badge bg-{{ $notice->target_audience == 'all' ? 'primary' : ($notice->target_audience == 'teachers' ? 'info' : 'success') }}">
                         {{ ucfirst($notice->target_audience) }}
                     </span>
-                    <small class="text-muted">{{ $notice->publish_date->format('M d, Y') }}</small>
+                    <small class="text-muted">{{ \App\Support\DateFormatter::display($notice->publish_date) }}</small>
                 </div>
                 <h6 class="fw-semibold">{{ $notice->title }}</h6>
                 <p class="text-muted small">{{ Str::limit(strip_tags($notice->content), 120) }}</p>

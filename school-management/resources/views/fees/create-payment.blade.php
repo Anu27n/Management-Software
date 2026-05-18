@@ -30,6 +30,7 @@
         'name' => $preset->name,
         'fee_category_id' => $preset->fee_category_id,
         'discount_type' => $preset->discount_type,
+        'eligibility_rule' => $preset->eligibility_rule,
         'value' => (float) $preset->value,
         'label' => $preset->name . ' (' . ($preset->discount_type === 'percentage' ? rtrim(rtrim(number_format((float) $preset->value, 2), '0'), '.') . '%' : 'Rs ' . number_format((float) $preset->value, 2)) . ')',
     ])->values();
@@ -121,9 +122,9 @@
                                     <th>Fee Head</th>
                                     <th style="width: 140px;">Assigned</th>
                                     <th style="width: 140px;">Paid</th>
-                                    <th style="width: 140px;">Discounted</th>
+                                    <th style="width: 140px;">Concession</th>
                                     <th style="width: 140px;">Due</th>
-                                    <th style="width: 260px;">Discount Now</th>
+                                    <th style="width: 260px;">Concession Now</th>
                                     <th style="width: 220px;">Collect Now</th>
                                 </tr>
                             </thead>
@@ -145,7 +146,7 @@
                             </tfoot>
                         </table>
                     </div>
-                    <small class="text-muted d-block mt-2">Paid rows are locked. Enter amount only in due rows to collect quickly.</small>
+                    <small class="text-muted d-block mt-2">Paid rows are locked. Enter amount only in due rows to collect quickly. Sibling concession applies only when an assigned elder sibling has already paid the same quarter.</small>
                 </div>
 
                 <div class="col-12 d-none print-only" id="printSignatures">
@@ -307,7 +308,7 @@
                         return !preset.fee_category_id || String(preset.fee_category_id) === String(row.fee_category_id);
                     });
                     const presetOptions = matchingPresets.map(function (preset) {
-                        return `<option value="${preset.id}" data-type="${escapeHtml(preset.discount_type)}" data-value="${Number(preset.value || 0)}">${escapeHtml(preset.label)}</option>`;
+                        return `<option value="${preset.id}" data-type="${escapeHtml(preset.discount_type)}" data-rule="${escapeHtml(preset.eligibility_rule || 'standard')}" data-value="${Number(preset.value || 0)}">${escapeHtml(preset.label)}</option>`;
                     }).join('');
 
                     tr.innerHTML = `
@@ -320,7 +321,7 @@
                         <td>
                             <div class="input-group input-group-sm mb-1">
                                 <select class="form-select" name="payments[${index}][discount_preset_id]" data-discount-preset="1" ${row.is_locked ? 'disabled' : ''}>
-                                    <option value="">Manual</option>
+                                    <option value="">Manual concession</option>
                                     ${presetOptions}
                                 </select>
                             </div>
@@ -514,7 +515,7 @@
                 state.dueInputs.forEach(function (input) {
                     input.classList.add('is-invalid');
                 });
-                alert('Enter payment or discount in at least one due fee head.');
+                alert('Enter payment or concession in at least one due fee head.');
                 state.dueInputs[0].focus();
             }
         });

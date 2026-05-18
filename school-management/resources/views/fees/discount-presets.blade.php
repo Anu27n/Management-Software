@@ -1,18 +1,18 @@
 @extends('layouts.app')
-@section('title', 'Discount Options')
-@section('page-title', 'Discount Options')
+@section('title', 'Concession Options')
+@section('page-title', 'Concession Options')
 
 @section('content')
 <div class="row g-3">
     <div class="col-lg-4">
         <div class="card table-card">
-            <div class="card-header bg-white"><h6 class="mb-0 fw-semibold">Add Discount Option</h6></div>
+            <div class="card-header bg-white"><h6 class="mb-0 fw-semibold">Add Concession Option</h6></div>
             <div class="card-body">
                 <form method="POST" action="{{ route('fees.discount-presets.store') }}">
                     @csrf
                     <div class="mb-3">
                         <label class="form-label">Name <span class="text-danger">*</span></label>
-                        <input type="text" name="name" class="form-control" value="{{ old('name') }}" placeholder="Sibling discount" required>
+                        <input type="text" name="name" class="form-control" value="{{ old('name') }}" placeholder="Sibling concession" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Fee Header</label>
@@ -22,6 +22,14 @@
                                 <option value="{{ $category->id }}" {{ (string) old('fee_category_id') === (string) $category->id ? 'selected' : '' }}>{{ $category->name }}</option>
                             @endforeach
                         </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Eligibility Rule <span class="text-danger">*</span></label>
+                        <select name="eligibility_rule" class="form-select" required>
+                            <option value="standard" {{ old('eligibility_rule', 'standard') === 'standard' ? 'selected' : '' }}>General concession</option>
+                            <option value="sibling" {{ old('eligibility_rule') === 'sibling' ? 'selected' : '' }}>Sibling concession</option>
+                        </select>
+                        <div class="form-text">Sibling concession is allowed only when an assigned elder sibling has already paid the same quarter fee.</div>
                     </div>
                     <div class="row g-2 mb-3">
                         <div class="col-6">
@@ -50,7 +58,7 @@
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-semibold">Saved Options</h6>
                 <div class="btn-group btn-group-sm">
-                    <a href="{{ route('fees.discounts') }}" class="btn btn-outline-info">Discount Records</a>
+                    <a href="{{ route('fees.discounts') }}" class="btn btn-outline-info">Concession Records</a>
                     <a href="{{ route('fees.payments.create') }}" class="btn btn-outline-primary">Quick Record</a>
                 </div>
             </div>
@@ -60,9 +68,10 @@
                         <tr>
                             <th>Name</th>
                             <th>Fee Header</th>
-                            <th>Discount</th>
+                            <th>Rule</th>
+                            <th>Concession</th>
                             <th>Status</th>
-                            <th style="width: 260px;">Edit</th>
+                            <th style="width: 280px;">Edit</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -71,6 +80,7 @@
                             <tr>
                                 <td class="fw-semibold">{{ $preset->name }}</td>
                                 <td>{{ $preset->feeCategory?->name ?? 'Any fee header' }}</td>
+                                <td>{{ $preset->eligibility_rule === 'sibling' ? 'Sibling' : 'General' }}</td>
                                 <td>
                                     @if($preset->discount_type === 'percentage')
                                         {{ number_format((float) $preset->value, 2) }}%
@@ -99,35 +109,41 @@
                                                 @endforeach
                                             </select>
                                         </div>
-                                        <div class="col-3">
+                                        <div class="col-6">
+                                            <select name="eligibility_rule" class="form-select form-select-sm">
+                                                <option value="standard" {{ $preset->eligibility_rule === 'standard' ? 'selected' : '' }}>General</option>
+                                                <option value="sibling" {{ $preset->eligibility_rule === 'sibling' ? 'selected' : '' }}>Sibling</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-4">
                                             <select name="discount_type" class="form-select form-select-sm">
                                                 <option value="percentage" {{ $preset->discount_type === 'percentage' ? 'selected' : '' }}>%</option>
                                                 <option value="fixed" {{ $preset->discount_type === 'fixed' ? 'selected' : '' }}>Rs</option>
                                             </select>
                                         </div>
-                                        <div class="col-3">
+                                        <div class="col-4">
                                             <input type="number" name="value" class="form-control form-control-sm" step="0.01" min="0.01" value="{{ $preset->value }}" required>
                                         </div>
-                                        <div class="col-7">
+                                        <div class="col-4">
                                             <div class="form-check form-switch small pt-1">
                                                 <input type="checkbox" class="form-check-input" name="is_active" value="1" id="preset_active_{{ $preset->id }}" {{ $preset->is_active ? 'checked' : '' }}>
                                                 <label class="form-check-label" for="preset_active_{{ $preset->id }}">Active</label>
                                             </div>
                                         </div>
-                                        <div class="col-5">
+                                        <div class="col-12">
                                             <button class="btn btn-outline-primary btn-sm w-100">Update</button>
                                         </div>
                                     </form>
                                 </td>
                                 <td class="text-end">
-                                    <form method="POST" action="{{ route('fees.discount-presets.destroy', $preset) }}" onsubmit="return confirm('Delete this discount option?')">
+                                    <form method="POST" action="{{ route('fees.discount-presets.destroy', $preset) }}" onsubmit="return confirm('Delete this concession option?')">
                                         @csrf @method('DELETE')
                                         <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
                                     </form>
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="text-center text-muted py-4">No discount options saved.</td></tr>
+                            <tr><td colspan="7" class="text-center text-muted py-4">No concession options saved.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

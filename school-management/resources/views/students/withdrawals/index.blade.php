@@ -171,7 +171,7 @@
                 @forelse($recentWithdrawals as $withdrawal)
                     <tr>
                         <td>{{ $withdrawal->student?->full_name ?? '-' }}</td>
-                        <td>{{ optional($withdrawal->withdrawal_date)->format('d M Y') }}</td>
+                        <td>{{ \App\Support\DateFormatter::display($withdrawal->withdrawal_date) }}</td>
                         <td>{{ $withdrawal->tc_issued ? 'Issued' : 'No' }}</td>
                         <td>{{ $withdrawal->security_refunded ? 'Refunded' : 'No' }}</td>
                     </tr>

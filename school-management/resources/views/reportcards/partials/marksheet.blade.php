@@ -8,6 +8,7 @@
     $firstReport = $marksheet['first_report'];
     $secondReport = $marksheet['second_report'];
     $personalAttributes = $marksheet['personal_attributes'];
+    $templateMeta = \App\Support\ReportTemplateRegistry::meta($selectedExam->resolved_template);
     $attributeFields = [
         'discipline_conduct' => 'Discipline & Conduct',
         'punctuality' => 'Punctuality',
@@ -36,7 +37,7 @@
             </div>
         </div>
         <div class="text-uppercase small fw-semibold marksheet-title-bar">
-            {{ $selectedExam->resolved_template === 'semester_2' ? 'Final / 2nd Semester Marksheet' : '1st Semester Marksheet' }}
+            {{ $templateMeta['title'] }}
         </div>
         <div class="small text-muted mt-1">{{ $selectedExam->name }}</div>
     </div>
@@ -217,7 +218,7 @@
                         <div class="mt-2"><strong>Yearly Average %:</strong> {{ number_format((float) $totals['percentage'], 2) }}%</div>
                         <div class="mt-2"><strong>Final Result:</strong> {{ $marksheet['result_label'] }}</div>
                         <div class="mt-2"><strong>{{ ($secondReport?->final_result === 'detained' ? 'Detained in Class' : 'Promoted to Class') }}:</strong> {{ $secondReport?->promotedToClass?->name ?? '-' }}</div>
-                        <div class="mt-2"><strong>School Reopens On:</strong> {{ optional($secondReport?->school_reopens_on)->format('M d, Y') ?? '-' }}</div>
+                        <div class="mt-2"><strong>School Reopens On:</strong> {{ \App\Support\DateFormatter::display($secondReport?->school_reopens_on) }}</div>
                         <div class="mt-2"><strong>Timings:</strong> {{ $secondReport?->school_timings ?: '-' }}</div>
                     @else
                         <div><strong>Grand Total:</strong> {{ number_format((float) $totals['first_semester_total'], 2) }}</div>

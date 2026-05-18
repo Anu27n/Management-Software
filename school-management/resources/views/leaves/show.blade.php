@@ -16,8 +16,8 @@
                 <table class="table table-borderless mb-0">
                     <tr><td class="text-muted" style="width:160px">Student</td><td class="fw-semibold">{{ $leave->student->full_name ?? '-' }}</td></tr>
                     <tr><td class="text-muted">Class / Section</td><td>{{ $leave->schoolClass->name ?? '-' }} / {{ $leave->section->name ?? '-' }}</td></tr>
-                    <tr><td class="text-muted">From</td><td>{{ $leave->from_date->format('M d, Y') }}</td></tr>
-                    <tr><td class="text-muted">To</td><td>{{ $leave->to_date->format('M d, Y') }}</td></tr>
+                    <tr><td class="text-muted">From</td><td>{{ \App\Support\DateFormatter::display($leave->from_date) }}</td></tr>
+                    <tr><td class="text-muted">To</td><td>{{ \App\Support\DateFormatter::display($leave->to_date) }}</td></tr>
                     <tr><td class="text-muted">Duration</td><td>{{ $leave->from_date->diffInDays($leave->to_date) + 1 }} day(s)</td></tr>
                     <tr><td class="text-muted">Reason</td><td>{{ $leave->reason }}</td></tr>
                     @if($leave->description)

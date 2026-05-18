@@ -63,8 +63,8 @@
                             <td class="fw-semibold">{{ $exam->name }}</td>
                             <td>{{ $exam->resolved_template === 'semester_2' ? 'Final / 2nd Semester' : '1st Semester' }}</td>
                             <td>{{ $exam->academicYear->name }}</td>
-                            <td>{{ $exam->start_date?->format('M d, Y') ?? '-' }}</td>
-                            <td>{{ $exam->end_date?->format('M d, Y') ?? '-' }}</td>
+                            <td>{{ \App\Support\DateFormatter::display($exam->start_date) }}</td>
+                            <td>{{ \App\Support\DateFormatter::display($exam->end_date) }}</td>
                             <td>
                                 <form action="{{ route('reportcards.exams.destroy', $exam) }}" method="POST" onsubmit="return confirm('Delete?')">
                                     @csrf @method('DELETE')

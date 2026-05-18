@@ -46,8 +46,8 @@
                         @forelse($academicYears as $year)
                         <tr>
                             <td class="fw-semibold">{{ $year->name }}</td>
-                            <td>{{ $year->start_date->format('M d, Y') }}</td>
-                            <td>{{ $year->end_date->format('M d, Y') }}</td>
+                            <td>{{ \App\Support\DateFormatter::display($year->start_date) }}</td>
+                            <td>{{ \App\Support\DateFormatter::display($year->end_date) }}</td>
                             <td>
                                 @if($year->is_active)
                                     <span class="badge bg-success">Active</span>

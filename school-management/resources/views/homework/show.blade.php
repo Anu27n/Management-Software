@@ -8,13 +8,13 @@
         <div class="card table-card">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-semibold">{{ $homework->title }}</h6>
-                <span class="badge {{ $homework->due_date->isPast() ? 'bg-danger' : 'bg-primary' }}">Due: {{ $homework->due_date->format('M d, Y') }}</span>
+                <span class="badge {{ $homework->due_date->isPast() ? 'bg-danger' : 'bg-primary' }}">Due: {{ \App\Support\DateFormatter::display($homework->due_date) }}</span>
             </div>
             <div class="card-body">
                 <div class="row mb-3">
                     <div class="col-4"><span class="text-muted">Class:</span> {{ $homework->schoolClass->name }} - {{ $homework->section->name }}</div>
                     <div class="col-4"><span class="text-muted">Subject:</span> {{ $homework->subject->name }}</div>
-                    <div class="col-4"><span class="text-muted">Assigned:</span> {{ $homework->assign_date->format('M d, Y') }}</div>
+                    <div class="col-4"><span class="text-muted">Assigned:</span> {{ \App\Support\DateFormatter::display($homework->assign_date) }}</div>
                 </div>
                 <div class="border rounded p-3 bg-light">
                     {!! nl2br(e($homework->description)) !!}

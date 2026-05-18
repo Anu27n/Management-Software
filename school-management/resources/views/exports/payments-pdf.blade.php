@@ -20,7 +20,7 @@
         <thead>
             <tr>
                 <th>#</th><th>Receipt</th><th>B.B No</th><th>Student</th><th>Category</th>
-                <th>Amount</th><th>Discount</th><th>Fine</th><th>Date</th><th>Method</th><th>Status</th>
+                <th>Amount</th><th>Concession</th><th>Fine</th><th>Date</th><th>Method</th><th>Status</th>
             </tr>
         </thead>
         <tbody>
@@ -36,7 +36,7 @@
                 <td class="text-right">{{ number_format($p->amount_paid, 2) }}</td>
                 <td class="text-right">{{ number_format($p->discount, 2) }}</td>
                 <td class="text-right">{{ number_format($p->fine, 2) }}</td>
-                <td>{{ $p->payment_date?->format('Y-m-d') }}</td>
+                <td>{{ \App\Support\DateFormatter::display($p->payment_date) }}</td>
                 <td>{{ ucfirst($p->payment_method) }}</td>
                 <td>{{ ucfirst($p->status) }}</td>
             </tr>

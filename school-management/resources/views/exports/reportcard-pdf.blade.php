@@ -350,7 +350,7 @@
         'spoken_english' => 'Spoken English',
         'personal_hygiene' => 'Personal Hygiene',
     ];
-    $title = $selectedExam->resolved_template === 'semester_2' ? 'Final / 2nd Semester Marksheet' : '1st Semester Marksheet';
+    $title = \App\Support\ReportTemplateRegistry::title($selectedExam->resolved_template);
     $grandTotal = $selectedExam->resolved_template === 'semester_2'
         ? (float) $totals['yearly_grand_total']
         : (float) $totals['first_semester_total'];
@@ -535,7 +535,7 @@
                         <div class="result-line result-emphasis"><strong>Final Status:</strong> {{ $marksheet['result_label'] }}</div>
                         <div class="result-line"><strong>Promoted to Class:</strong> {{ $secondReport?->final_result === 'promoted' ? ($secondReport?->promotedToClass?->name ?? '-') : '-' }}</div>
                         <div class="result-line"><strong>Detained in Class:</strong> {{ $secondReport?->final_result === 'detained' ? ($secondReport?->promotedToClass?->name ?? '-') : '-' }}</div>
-                        <div class="result-line"><strong>School Reopens On:</strong> {{ optional($secondReport?->school_reopens_on)->format('M d, Y') ?? '-' }}</div>
+                        <div class="result-line"><strong>School Reopens On:</strong> {{ \App\Support\DateFormatter::display($secondReport?->school_reopens_on) }}</div>
                         <div class="result-line"><strong>Timings:</strong> {{ $secondReport?->school_timings ?: '-' }}</div>
                     </td>
                     <td>

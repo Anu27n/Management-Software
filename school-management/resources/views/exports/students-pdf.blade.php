@@ -32,7 +32,7 @@
                 <td>{{ $s->admission_no }}</td>
                 <td>{{ $s->full_name }}</td>
                 <td>{{ ucfirst($s->gender) }}</td>
-                <td>{{ $s->date_of_birth?->format('Y-m-d') }}</td>
+                <td>{{ \App\Support\DateFormatter::display($s->date_of_birth) }}</td>
                 <td>{{ $s->schoolClass->name ?? '-' }}</td>
                 <td>{{ $s->section->name ?? '-' }}</td>
                 <td>{{ $s->father_name }}</td>

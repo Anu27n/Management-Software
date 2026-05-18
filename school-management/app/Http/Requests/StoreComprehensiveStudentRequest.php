@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\SchoolClass;
+use App\Models\Student;
 use App\Support\ClassEligibility;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -90,6 +91,7 @@ class StoreComprehensiveStudentRequest extends FormRequest
             'has_siblings' => ['nullable', 'boolean'],
             'sibling_count' => ['nullable', 'integer', 'min:0', 'max:10'],
             'sibling_details' => ['nullable', 'array'],
+            'sibling_details.*.student_id' => ['nullable', 'exists:students,id'],
             'sibling_details.*.name' => ['nullable', 'string', 'max:255'],
             'sibling_details.*.is_studying' => ['nullable', 'boolean'],
             'sibling_details.*.class_id' => ['nullable', 'exists:classes,id'],
@@ -172,6 +174,16 @@ class StoreComprehensiveStudentRequest extends FormRequest
             if ($hasSiblings) {
                 $siblingCount = (int) $this->input('sibling_count', 0);
                 $siblings = collect($this->input('sibling_details', []))->filter(fn ($item) => is_array($item));
+                $selectedSiblingIds = $siblings
+                    ->pluck('student_id')
+                    ->filter(fn ($value) => filled($value))
+                    ->map(fn ($value) => (int) $value)
+                    ->values();
+                $selectedSiblings = Student::query()
+                    ->with('schoolClass:id,name')
+                    ->whereIn('id', $selectedSiblingIds)
+                    ->get()
+                    ->keyBy('id');
 
                 if ($siblingCount <= 0) {
                     $validator->errors()->add('sibling_count', 'Enter the number of siblings when siblings is marked Yes.');
@@ -181,7 +193,7 @@ class StoreComprehensiveStudentRequest extends FormRequest
                     $validator->errors()->add('sibling_details', 'Enter all sibling details.');
                 }
 
-                $siblings->take($siblingCount)->each(function ($sibling, $index) use ($validator) {
+                $siblings->take($siblingCount)->each(function ($sibling, $index) use ($validator, $selectedSiblings) {
                     if (blank($sibling['name'] ?? null)) {
                         $validator->errors()->add("sibling_details.$index.name", 'Sibling name is required.');
                     }
@@ -189,8 +201,42 @@ class StoreComprehensiveStudentRequest extends FormRequest
                     if (!empty($sibling['is_studying']) && blank($sibling['class_id'] ?? null)) {
                         $validator->errors()->add("sibling_details.$index.class_id", 'Sibling class is required when studying is Yes.');
                     }
+
+                    $siblingStudentId = filled($sibling['student_id'] ?? null) ? (int) $sibling['student_id'] : null;
+                    if (!$siblingStudentId) {
+                        return;
+                    }
+
+                    $linkedSibling = $selectedSiblings->get($siblingStudentId);
+                    if (!$linkedSibling) {
+                        $validator->errors()->add("sibling_details.$index.student_id", 'Selected sibling record was not found.');
+                        return;
+                    }
+
+                    $incomingFather = $this->normalizePersonName($this->input('father_name'));
+                    $incomingMother = $this->normalizePersonName($this->input('mother_name'));
+                    $linkedFather = $this->normalizePersonName($linkedSibling->father_name);
+                    $linkedMother = $this->normalizePersonName($linkedSibling->mother_name);
+
+                    if ($incomingFather === '' || $incomingMother === '' || $linkedFather === '' || $linkedMother === '') {
+                        $validator->errors()->add("sibling_details.$index.student_id", 'Assigned sibling requires matching father and mother names on both student records.');
+                        return;
+                    }
+
+                    if ($incomingFather !== $linkedFather || $incomingMother !== $linkedMother) {
+                        $validator->errors()->add("sibling_details.$index.student_id", 'Father name and mother name must match before assigning this sibling.');
+                    }
                 });
+
+                if ($selectedSiblingIds->count() !== $selectedSiblingIds->unique()->count()) {
+                    $validator->errors()->add('sibling_details', 'The same sibling cannot be assigned more than once.');
+                }
             }
         });
+    }
+
+    private function normalizePersonName(?string $value): string
+    {
+        return strtolower(trim(preg_replace('/\s+/', ' ', (string) $value)));
     }
 }

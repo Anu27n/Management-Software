@@ -213,7 +213,7 @@
                                 <span class="badge bg-secondary">Inactive</span>
                             @endif
                         </td>
-                        <td>{{ $user->created_at->format('d M Y') }}</td>
+                        <td>{{ \App\Support\DateFormatter::display($user->created_at) }}</td>
                         <td class="text-end">
                             <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editUser{{ $user->id }}">
                                 <i class="bi bi-pencil"></i>

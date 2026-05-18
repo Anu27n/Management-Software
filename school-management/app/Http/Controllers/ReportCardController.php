@@ -10,6 +10,7 @@ use App\Models\Section;
 use App\Models\Student;
 use App\Models\StudentExamReport;
 use App\Support\MarksheetBuilder;
+use App\Support\ReportTemplateRegistry;
 use App\Support\ReportCardSubjectResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -122,7 +123,7 @@ class ReportCardController extends Controller
 
         $validated = $request->validate([
             'academic_year_id' => 'required|exists:academic_years,id',
-            'report_template' => ['required', Rule::in(['semester_1', 'semester_2'])],
+            'report_template' => ['required', Rule::in(ReportTemplateRegistry::keys())],
             'class_id' => 'required|exists:classes,id',
             'section_id' => 'required|exists:sections,id',
             'student_id' => 'required|exists:students,id',
@@ -321,7 +322,7 @@ class ReportCardController extends Controller
 
     private function resolveTemplateExam(int $academicYearId, string $template): Exam
     {
-        $name = $template === 'semester_2' ? 'Final / 2nd Semester' : '1st Semester';
+        $meta = ReportTemplateRegistry::meta($template);
 
         return Exam::firstOrCreate(
             [
@@ -329,8 +330,8 @@ class ReportCardController extends Controller
                 'report_template' => $template,
             ],
             [
-                'name' => $name,
-                'term_number' => $template === 'semester_2' ? 2 : 1,
+                'name' => $meta['exam_name'],
+                'term_number' => $meta['term_number'],
             ]
         );
     }

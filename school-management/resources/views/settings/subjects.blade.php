@@ -15,7 +15,7 @@
                         <select name="class_id" class="form-select @error('class_id') is-invalid @enderror" required>
                             <option value="">Select Class</option>
                             @foreach($classes as $class)
-                                <option value="{{ $class->id }}">{{ $class->name }}</option>
+                                <option value="{{ $class->id }}" {{ (string) old('class_id') === (string) $class->id ? 'selected' : '' }}>{{ $class->name }}</option>
                             @endforeach
                         </select>
                         @error('class_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
@@ -24,6 +24,21 @@
                         <label class="form-label">Subject Name <span class="text-danger">*</span></label>
                         <input type="text" name="name" class="form-control @error('name') is-invalid @enderror" value="{{ old('name') }}" required placeholder="e.g. Mathematics">
                         @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Category <span class="text-danger">*</span></label>
+                            <select name="category" class="form-select @error('category') is-invalid @enderror" required>
+                                <option value="scholastic" {{ old('category', 'scholastic') === 'scholastic' ? 'selected' : '' }}>Scholastic</option>
+                                <option value="grading" {{ old('category') === 'grading' ? 'selected' : '' }}>Grading</option>
+                            </select>
+                            @error('category')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Display Order</label>
+                            <input type="number" name="display_order" class="form-control @error('display_order') is-invalid @enderror" min="0" max="999" value="{{ old('display_order', 0) }}">
+                            @error('display_order')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Code</label>
@@ -39,12 +54,14 @@
             <div class="card-header bg-white"><h6 class="mb-0 fw-semibold">All Subjects</h6></div>
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
-                    <thead class="table-light"><tr><th>Subject</th><th>Code</th><th>Class</th><th></th></tr></thead>
+                    <thead class="table-light"><tr><th>Subject</th><th>Code</th><th>Category</th><th>Order</th><th>Class</th><th></th></tr></thead>
                     <tbody>
                         @forelse($subjects as $subject)
                         <tr>
                             <td class="fw-semibold">{{ $subject->name }}</td>
                             <td>{{ $subject->code ?? '-' }}</td>
+                            <td>{{ ucfirst($subject->category ?? 'scholastic') }}</td>
+                            <td>{{ $subject->display_order ?? 0 }}</td>
                             <td>{{ $subject->schoolClass->name }}</td>
                             <td>
                                 <form action="{{ route('settings.subjects.destroy', $subject) }}" method="POST" onsubmit="return confirm('Delete?')">
@@ -54,7 +71,7 @@
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="4" class="text-center text-muted py-3">No subjects added</td></tr>
+                        <tr><td colspan="6" class="text-center text-muted py-3">No subjects added</td></tr>
                         @endforelse
                     </tbody>
                 </table>

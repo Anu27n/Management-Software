@@ -19,9 +19,36 @@
                 <div class="border rounded p-3 bg-light h-100">
                     <div class="text-muted small">Fee Head</div>
                     <div class="fw-semibold">{{ $payment->feeStructure?->display_name ?? '-' }}</div>
-                    <div class="small text-muted">Assigned: Rs {{ number_format((float) ($payment->feeStructure?->amount ?? 0), 2) }}</div>
+                    <div class="small text-muted">Assigned: Rs {{ number_format((float) ($paymentSummary['assigned_amount'] ?? 0), 2) }}</div>
                 </div>
             </div>
+        </div>
+
+        <div class="table-responsive border rounded mb-4">
+            <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Fee Head</th>
+                        <th>Assigned</th>
+                        <th>Paid Before</th>
+                        <th>Concession Before</th>
+                        <th>This Receipt Paid</th>
+                        <th>This Receipt Concession</th>
+                        <th>Due After This Receipt</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="fw-semibold">{{ $payment->feeStructure?->display_name ?? '-' }}</td>
+                        <td>Rs {{ number_format((float) ($paymentSummary['assigned_amount'] ?? 0), 2) }}</td>
+                        <td>Rs {{ number_format((float) ($paymentSummary['paid_before'] ?? 0), 2) }}</td>
+                        <td class="text-success">Rs {{ number_format((float) ($paymentSummary['concession_before'] ?? 0), 2) }}</td>
+                        <td>Rs {{ number_format((float) ($paymentSummary['current_paid'] ?? 0), 2) }}</td>
+                        <td class="text-success">Rs {{ number_format((float) ($paymentSummary['current_concession'] ?? 0), 2) }}</td>
+                        <td class="fw-semibold {{ (float) ($paymentSummary['due_after'] ?? 0) > 0 ? 'text-danger' : 'text-success' }}">Rs {{ number_format((float) ($paymentSummary['due_after'] ?? 0), 2) }}</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
 
         <form method="POST" action="{{ route('fees.payments.update', $payment) }}">
@@ -46,7 +73,7 @@
                     <input type="number" name="amount_paid" class="form-control" step="0.01" min="0" value="{{ old('amount_paid', $payment->amount_paid) }}" required>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Discount</label>
+                    <label class="form-label">Concession</label>
                     <input type="number" name="discount" class="form-control" step="0.01" min="0" value="{{ old('discount', $payment->discount) }}">
                 </div>
                 <div class="col-md-3">

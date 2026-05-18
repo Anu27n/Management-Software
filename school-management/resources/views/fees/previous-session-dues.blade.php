@@ -119,7 +119,7 @@
                             @else
                                 <span class="badge bg-success">Settled</span>
                                 @if($due->settled_at)
-                                    <div class="small text-muted">{{ $due->settled_at->format('d M Y') }}</div>
+                                    <div class="small text-muted">{{ \App\Support\DateFormatter::display($due->settled_at) }}</div>
                                 @endif
                             @endif
                         </td>

@@ -51,7 +51,7 @@
                     @forelse($recentNotices as $notice)
                         <a href="{{ route('notices.show', $notice) }}" class="list-group-item list-group-item-action">
                             <div class="fw-semibold">{{ $notice->title }}</div>
-                            <small class="text-muted">{{ $notice->publish_date?->format('d M Y') }}</small>
+                            <small class="text-muted">{{ \App\Support\DateFormatter::display($notice->publish_date) }}</small>
                         </a>
                     @empty
                         <div class="text-center py-4 text-muted">No notices yet.</div>
@@ -88,7 +88,7 @@
                         {{ $academicYear?->name ?? 'All Academic Years' }}
                         @if(!empty($filters['date_from']) && !empty($filters['date_to']))
                             <span class="mx-1">|</span>
-                            {{ \Carbon\Carbon::parse($filters['date_from'])->format('d M Y') }} to {{ \Carbon\Carbon::parse($filters['date_to'])->format('d M Y') }}
+                            {{ \App\Support\DateFormatter::display($filters['date_from']) }} to {{ \App\Support\DateFormatter::display($filters['date_to']) }}
                         @endif
                     </div>
                 </div>
@@ -380,7 +380,7 @@
                     @forelse($announcements as $notice)
                         <a href="{{ route('notices.show', $notice) }}" class="list-group-item list-group-item-action">
                             <div class="fw-semibold">{{ $notice->title }}</div>
-                            <small class="text-muted">{{ $notice->publish_date?->format('d M Y') }}</small>
+                            <small class="text-muted">{{ \App\Support\DateFormatter::display($notice->publish_date) }}</small>
                         </a>
                     @empty
                         <div class="text-center py-4 text-muted">No announcements available.</div>

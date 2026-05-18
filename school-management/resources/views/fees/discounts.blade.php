@@ -1,13 +1,13 @@
 @extends('layouts.app')
-@section('title', 'Discount Records')
-@section('page-title', 'Discount Records')
+@section('title', 'Concession Records')
+@section('page-title', 'Concession Records')
 
 @section('content')
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
     <div class="btn-group btn-group-sm">
         <a href="{{ route('fees.payments') }}" class="btn btn-outline-primary">Payments</a>
         <a href="{{ route('fees.due') }}" class="btn btn-outline-warning">Due Fees</a>
-        <a href="{{ route('fees.discount-presets') }}" class="btn btn-outline-info">Discount Options</a>
+        <a href="{{ route('fees.discount-presets') }}" class="btn btn-outline-info">Concession Options</a>
     </div>
     <a href="{{ route('fees.payments.create') }}" class="btn btn-primary btn-sm"><i class="bi bi-lightning-charge me-1"></i>Quick Record</a>
 </div>
@@ -16,7 +16,7 @@
     <div class="col-md-6 col-xl-3">
         <div class="card stat-card h-100">
             <div class="card-body">
-                <div class="text-muted small">Discount Entries</div>
+                <div class="text-muted small">Concession Entries</div>
                 <div class="fs-4 fw-bold">{{ $summary['total_discount_records'] }}</div>
             </div>
         </div>
@@ -24,7 +24,7 @@
     <div class="col-md-6 col-xl-3">
         <div class="card stat-card h-100">
             <div class="card-body">
-                <div class="text-muted small">Total Discount Given</div>
+                <div class="text-muted small">Total Concession Given</div>
                 <div class="fs-4 fw-bold">Rs {{ number_format((float) $summary['total_discount_amount'], 2) }}</div>
             </div>
         </div>
@@ -62,8 +62,8 @@
                     <th>Student</th>
                     <th>Fee Head</th>
                     <th>Receipt</th>
-                    <th>Discount Amount</th>
-                    <th>Discount %</th>
+                    <th>Concession Amount</th>
+                    <th>Concession %</th>
                     <th>Recorded By</th>
                     <th>Remarks</th>
                 </tr>
@@ -71,7 +71,7 @@
             <tbody>
                 @forelse($discounts as $discount)
                     <tr>
-                        <td>{{ $discount->created_at?->format('d M Y') }}</td>
+                        <td>{{ \App\Support\DateFormatter::display($discount->created_at) }}</td>
                         <td>
                             <div class="fw-semibold">{{ $discount->student?->full_name ?? '-' }}</div>
                             <small class="text-muted">{{ $discount->student?->admission_no ?? '-' }}</small>
@@ -84,7 +84,7 @@
                         <td>{{ $discount->remarks ?: '-' }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="8" class="text-center text-muted py-4">No discount records found.</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted py-4">No concession records found.</td></tr>
                 @endforelse
             </tbody>
         </table>

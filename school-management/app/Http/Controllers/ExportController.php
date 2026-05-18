@@ -8,7 +8,9 @@ use App\Models\FeePayment;
 use App\Models\Attendance;
 use App\Models\ExamResult;
 use App\Models\AcademicYear;
+use App\Support\DateFormatter;
 use App\Support\MarksheetBuilder;
+use App\Support\ReportTemplateRegistry;
 use Illuminate\Http\Request;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -26,7 +28,7 @@ class ExportController extends Controller
         ], $students, function ($s) {
             return [
                 $s->admission_no, $s->first_name, $s->last_name, $s->gender,
-                $s->date_of_birth?->format('Y-m-d'), $s->schoolClass->name ?? '',
+                DateFormatter::display($s->date_of_birth), $s->schoolClass->name ?? '',
                 $s->section->name ?? '', $s->father_name, $s->phone, $s->email, $s->status,
             ];
         });
@@ -45,7 +47,7 @@ class ExportController extends Controller
         $payments = $this->getFilteredPayments($request);
 
         return $this->streamCsv('fee-payments.csv', [
-            'Receipt No', 'Student', 'Category', 'Amount Paid', 'Discount', 'Fine',
+            'Receipt No', 'Student', 'Category', 'Amount Paid', 'Concession', 'Fine',
             'Payment Date', 'Method', 'Status'
         ], $payments, function ($p) {
             return [
@@ -53,7 +55,7 @@ class ExportController extends Controller
                 $p->student->full_name ?? '',
                 $p->feeStructure->display_name ?? '',
                 $p->amount_paid, $p->discount, $p->fine,
-                $p->payment_date?->format('Y-m-d'),
+                DateFormatter::display($p->payment_date),
                 $p->payment_method, $p->status,
             ];
         });
@@ -96,7 +98,7 @@ class ExportController extends Controller
             'student_id' => 'required',
             'exam_id' => 'nullable|exists:exams,id',
             'academic_year_id' => 'required_without:exam_id|nullable|exists:academic_years,id',
-            'report_template' => 'required_without:exam_id|nullable|in:semester_1,semester_2',
+            'report_template' => ['required_without:exam_id', 'nullable', 'in:' . implode(',', ReportTemplateRegistry::keys())],
         ]);
 
         $student = Student::with(['schoolClass', 'section', 'academicYear'])->findOrFail($request->student_id);
@@ -108,8 +110,8 @@ class ExportController extends Controller
                     'report_template' => $request->report_template,
                 ],
                 [
-                    'name' => $request->report_template === 'semester_2' ? 'Final / 2nd Semester' : '1st Semester',
-                    'term_number' => $request->report_template === 'semester_2' ? 2 : 1,
+                    'name' => ReportTemplateRegistry::examName((string) $request->report_template),
+                    'term_number' => ReportTemplateRegistry::termNumber((string) $request->report_template),
                 ]
             );
         $marksheet = (new MarksheetBuilder())->build($student, $exam);

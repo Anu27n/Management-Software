@@ -15,6 +15,8 @@
     $attributeGrades = ['A', 'B', 'C', 'D', 'Excellent', 'Good', 'Average'];
     $gradingGrades = ['A+', 'A', 'B+', 'B', 'C', 'D', 'Excellent', 'Good', 'Average'];
     $currentTemplate = $selectedExam?->resolved_template ?? $selectedTemplate;
+    $templateOptions = \App\Support\ReportTemplateRegistry::all();
+    $currentTemplateMeta = \App\Support\ReportTemplateRegistry::meta($currentTemplate);
     $previewRows = collect($marksheetPreview['subject_rows'] ?? []);
 @endphp
 
@@ -51,8 +53,9 @@
             <div class="col-md-3">
                 <label class="form-label">Marksheet Template <span class="text-danger">*</span></label>
                 <select name="report_template" class="form-select" required>
-                    <option value="semester_1" {{ $selectedTemplate === 'semester_1' ? 'selected' : '' }}>1st Semester</option>
-                    <option value="semester_2" {{ $selectedTemplate === 'semester_2' ? 'selected' : '' }}>Final / 2nd Semester</option>
+                    @foreach($templateOptions as $templateKey => $templateMeta)
+                        <option value="{{ $templateKey }}" {{ $selectedTemplate === $templateKey ? 'selected' : '' }}>{{ $templateMeta['label'] }}</option>
+                    @endforeach
                 </select>
             </div>
             <div class="col-md-2">
@@ -81,7 +84,7 @@
             <div class="text-muted small">
                 {{ $selectedStudent->schoolClass?->name }} - {{ $selectedStudent->section?->name }}
                 | {{ $selectedStudent->academicYear?->name }}
-                | {{ $currentTemplate === 'semester_2' ? 'Final / 2nd Semester Marksheet' : '1st Semester Marksheet' }}
+                | {{ $currentTemplateMeta['title'] }}
             </div>
         </div>
         <a href="{{ route('reportcards.view', ['academic_year_id' => $selectedAcademicYear, 'report_template' => $selectedTemplate, 'student_id' => $selectedStudent->id]) }}" class="btn btn-outline-primary btn-sm">Preview Marksheet</a>
@@ -99,7 +102,7 @@
                 @if($currentTemplate === 'semester_2')
                     1st semester marks are fetched automatically and shown as read-only. Enter only 2nd semester marks below.
                 @else
-                    Enter 1st semester marks directly for this student. Totals are calculated automatically.
+                    Enter marks directly for this template. Totals are calculated automatically.
                 @endif
             </div>
 
@@ -217,11 +220,11 @@
 
             <div class="row g-3 mb-4">
                 <div class="col-md-6">
-                    <label class="form-label">{{ $currentTemplate === 'semester_2' ? '2nd Unit Test Remarks' : '1st Unit Test Remarks' }}</label>
+                    <label class="form-label">{{ $currentTemplate === 'semester_2' ? '2nd Unit Test Remarks' : 'Unit Test Remarks' }}</label>
                     <textarea name="remarks_unit_test" class="form-control" rows="3">{{ old('remarks_unit_test', $existingReport?->remarks_unit_test) }}</textarea>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">{{ $currentTemplate === 'semester_2' ? 'Final Exam Remarks' : 'Half Yearly Remarks' }}</label>
+                    <label class="form-label">{{ $currentTemplate === 'semester_2' ? 'Final Exam Remarks' : 'Main Exam Remarks' }}</label>
                     <textarea name="remarks_main_exam" class="form-control" rows="3">{{ old('remarks_main_exam', $existingReport?->remarks_main_exam) }}</textarea>
                 </div>
             </div>

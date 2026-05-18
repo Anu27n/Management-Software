@@ -381,8 +381,13 @@ class SettingsController extends Controller
 
     public function subjects()
     {
-        $subjects = Subject::with('schoolClass')->get();
-        $classes = SchoolClass::all();
+        $subjects = Subject::with('schoolClass')
+            ->orderBy('class_id')
+            ->orderBy('category')
+            ->orderBy('display_order')
+            ->orderBy('name')
+            ->get();
+        $classes = SchoolClass::orderBy('numeric_name')->orderBy('name')->get();
         return view('settings.subjects', compact('subjects', 'classes'));
     }
 
@@ -392,8 +397,11 @@ class SettingsController extends Controller
             'name' => 'required|string|max:255',
             'code' => 'nullable|string|max:20',
             'class_id' => 'required|exists:classes,id',
+            'category' => 'required|in:scholastic,grading',
+            'display_order' => 'nullable|integer|min:0|max:999',
         ]);
 
+        $validated['display_order'] = $validated['display_order'] ?? 0;
         Subject::create($validated);
         return redirect()->route('settings.subjects')->with('success', 'Subject created.');
     }

@@ -77,7 +77,7 @@
                 <h6 class="mb-0 fw-semibold">All Structures</h6>
                 <div class="btn-group btn-group-sm">
                     <a href="{{ route('fees.categories') }}" class="btn btn-outline-primary">Categories</a>
-                    <a href="{{ route('fees.discount-presets') }}" class="btn btn-outline-info">Discount Options</a>
+                    <a href="{{ route('fees.discount-presets') }}" class="btn btn-outline-info">Concession Options</a>
                     <a href="{{ route('fees.payments') }}" class="btn btn-outline-primary">Payments</a>
                 </div>
             </div>
@@ -98,7 +98,7 @@
                                     <span class="text-muted">All</span>
                                 @endif
                             </td>
-                            <td>{{ $s->due_date?->format('M d, Y') ?? '-' }}</td>
+                            <td>{{ \App\Support\DateFormatter::display($s->due_date) }}</td>
                             <td>
                                 <form action="{{ route('fees.structures.destroy', $s) }}" method="POST" onsubmit="return confirm('Delete?')">
                                     @csrf @method('DELETE')

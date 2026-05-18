@@ -7,7 +7,7 @@
     $profile = $student->profile;
     $display = function ($value) {
         if ($value instanceof \Carbon\CarbonInterface) {
-            return $value->format('M d, Y');
+            return \App\Support\DateFormatter::display($value);
         }
 
         if (is_bool($value)) {
@@ -93,10 +93,13 @@
                 'Guardian Address' => $profile?->office_address,
                 'Has Siblings' => $profile?->has_siblings,
                 'Sibling Count' => $profile?->sibling_count,
-                'Sibling 1 Name' => $profile?->sibling_1_name,
-                'Sibling 1 Class' => $profile?->sibling_1_class,
-                'Sibling 2 Name' => $profile?->sibling_2_name,
-                'Sibling 2 Class' => $profile?->sibling_2_class,
+                'Assigned Siblings' => collect($profile?->sibling_details ?? [])->map(function ($sibling) {
+                    $label = trim((string) ($sibling['name'] ?? ''));
+                    $admission = trim((string) ($sibling['admission_no'] ?? ''));
+                    $className = trim((string) ($sibling['class_name'] ?? ''));
+
+                    return collect([$label, $admission !== '' ? 'Adm: ' . $admission : null, $className !== '' ? 'Class: ' . $className : null])->filter()->implode(' | ');
+                })->filter()->join(' || '),
             ],
         ],
         [
@@ -229,7 +232,7 @@
                             <td>{{ $payment->receipt_no }}</td>
                             <td>{{ $payment->feeStructure->display_name ?? '-' }}</td>
                             <td>Rs {{ number_format((float) $payment->amount_paid, 2) }}</td>
-                            <td>{{ $payment->payment_date->format('M d, Y') }}</td>
+                            <td>{{ \App\Support\DateFormatter::display($payment->payment_date) }}</td>
                             <td><span class="badge bg-{{ $payment->status == 'paid' ? 'success' : 'warning' }}">{{ ucfirst($payment->status) }}</span></td>
                         </tr>
                         @empty

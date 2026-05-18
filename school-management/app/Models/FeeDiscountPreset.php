@@ -11,6 +11,7 @@ class FeeDiscountPreset extends Model
         'name',
         'fee_category_id',
         'discount_type',
+        'eligibility_rule',
         'value',
         'is_active',
     ];
