@@ -14,7 +14,7 @@ This is a native Android wrapper for the School Management System web applicatio
 Open `app/build.gradle` and change the `BASE_URL` to your server's URL:
 
 ```gradle
-buildConfigField "String", "BASE_URL", "\"https://your-actual-server-url.com\""
+buildConfigField "String", "BASE_URL", "\"https://wahs.stxs.cloud\""
 ```
 
 **For local development with Android Emulator:**

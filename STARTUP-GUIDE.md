@@ -70,7 +70,7 @@ Edit file:
 Set BASE_URL to your live or local web URL.
 
 Examples:
-- Live: https://your-domain.com
+- Live: https://wahs.stxs.cloud
 - Emulator local web: http://10.0.2.2:8000
 
 ### Build debug APK
